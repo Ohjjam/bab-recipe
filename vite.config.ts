@@ -13,10 +13,10 @@ export default defineConfig({
         theme_color: '#4CAF50',
         background_color: '#FAFAF5',
         display: 'standalone',
-        start_url: '/',
+        start_url: '/bab-recipe/',
         icons: [
-          { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
-          { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
+          { src: '/bab-recipe/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+          { src: '/bab-recipe/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
         ],
       },
       workbox: {
