@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#4CAF50" />
+  <title>밥 레시피</title>
+  <link rel="icon" href="/favicon.ico" />
+  <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+</head>
+<body>
+  <div id="app">
+    <header class="app-header">
+      <h1 class="app-title">🍚 밥 레시피</h1>
+    </header>
+    <main id="content"></main>
+    <nav class="bottom-nav">
+      <button class="nav-item active" data-route="/ingredients">
+        <span class="nav-icon">🧊</span>
+        <span class="nav-label">재료</span>
+      </button>
+      <button class="nav-item" data-route="/recipe">
+        <span class="nav-icon">🍳</span>
+        <span class="nav-label">레시피</span>
+      </button>
+      <button class="nav-item" data-route="/chat">
+        <span class="nav-icon">💬</span>
+        <span class="nav-label">채팅</span>
+      </button>
+      <button class="nav-item" data-route="/settings">
+        <span class="nav-icon">⚙️</span>
+        <span class="nav-label">설정</span>
+      </button>
+    </nav>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
