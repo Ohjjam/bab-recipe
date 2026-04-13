@@ -19,4 +19,6 @@ export const EVENTS = {
   INGREDIENTS_CHANGED: 'ingredients-changed',
   CHAT_CHANGED: 'chat-changed',
   SETTINGS_CHANGED: 'settings-changed',
+  BOOKMARKS_CHANGED: 'bookmarks-changed',
+  MEALS_CHANGED: 'meals-changed',
 } as const;

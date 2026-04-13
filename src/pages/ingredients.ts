@@ -14,7 +14,9 @@ export function renderIngredients(container: HTMLElement): () => void {
         ${CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('')}
       </select>
       <button type="submit" class="btn btn-primary">+</button>
+      <button type="button" class="btn-voice" id="voice-btn" title="음성 입력">🎤</button>
     </form>
+    <div id="voice-status" class="voice-status" style="display:none"></div>
     <div class="ingredient-list" id="ingredient-list"></div>
   `;
 
@@ -24,7 +26,82 @@ export function renderIngredients(container: HTMLElement): () => void {
   const nameInput = container.querySelector('#add-name') as HTMLInputElement;
   const memoInput = container.querySelector('#add-memo') as HTMLInputElement;
   const catSelect = container.querySelector('#add-cat') as HTMLSelectElement;
+  const voiceBtn = container.querySelector('#voice-btn') as HTMLButtonElement;
+  const voiceStatus = container.querySelector('#voice-status') as HTMLElement;
 
+  // --- Voice Input ---
+  let recognition: SpeechRecognition | null = null;
+  let isListening = false;
+
+  const SpeechRecognitionAPI = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+  if (!SpeechRecognitionAPI) {
+    voiceBtn.style.display = 'none'; // 음성 인식 미지원 브라우저
+  }
+
+  function startVoice() {
+    if (!SpeechRecognitionAPI) return;
+
+    const rec: SpeechRecognition = new SpeechRecognitionAPI();
+    recognition = rec;
+    rec.lang = 'ko-KR';
+    rec.continuous = true;
+    rec.interimResults = false;
+
+    rec.onresult = async (event: SpeechRecognitionEvent) => {
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        if (!event.results[i].isFinal) continue;
+        const text = event.results[i][0].transcript.trim();
+        if (!text) continue;
+
+        const parsed = parseVoiceInput(text);
+        const ingredient: Ingredient = {
+          id: crypto.randomUUID(),
+          name: parsed.name,
+          category: parsed.category,
+          addedAt: Date.now(),
+        };
+        await addIngredient(ingredient);
+        emit(EVENTS.INGREDIENTS_CHANGED);
+        voiceStatus.textContent = `✅ "${parsed.name}" 추가됨 (${parsed.category})`;
+      }
+    };
+
+    rec.onerror = () => {
+      stopVoice();
+      voiceStatus.textContent = '❌ 음성 인식 오류. 다시 시도해주세요.';
+    };
+
+    rec.onend = () => {
+      if (isListening) {
+        try { recognition?.start(); } catch { stopVoice(); }
+      }
+    };
+
+    rec.start();
+    isListening = true;
+    voiceBtn.classList.add('listening');
+    voiceStatus.style.display = 'block';
+    voiceStatus.textContent = '🎙️ 듣고 있어요... 재료 이름을 말해주세요';
+  }
+
+  function stopVoice() {
+    isListening = false;
+    recognition?.stop();
+    recognition = null;
+    voiceBtn.classList.remove('listening');
+    setTimeout(() => { voiceStatus.style.display = 'none'; }, 2000);
+  }
+
+  voiceBtn.addEventListener('click', () => {
+    if (isListening) {
+      stopVoice();
+    } else {
+      startVoice();
+    }
+  });
+
+  // --- Tabs ---
   function renderTabs() {
     const allTabs: (Category | '전체')[] = ['전체', ...CATEGORIES];
     tabsEl.innerHTML = allTabs.map(c =>
@@ -59,7 +136,6 @@ export function renderIngredients(container: HTMLElement): () => void {
     `).join('');
   }
 
-  // Tab click
   tabsEl.addEventListener('click', (e) => {
     const btn = (e.target as HTMLElement).closest('.category-tab') as HTMLElement | null;
     if (!btn) return;
@@ -102,7 +178,25 @@ export function renderIngredients(container: HTMLElement): () => void {
   renderList();
 
   const unsub = subscribe(EVENTS.INGREDIENTS_CHANGED, () => renderList());
-  return unsub;
+  return () => {
+    unsub();
+    stopVoice();
+  };
+}
+
+// "당근 냉장" → { name: "당근", category: "냉장" }
+function parseVoiceInput(text: string): { name: string; category: Category } {
+  const categories: Category[] = ['냉장', '냉동', '상온', '양념'];
+  const words = text.split(/\s+/);
+  const lastWord = words[words.length - 1];
+
+  if (categories.includes(lastWord as Category) && words.length > 1) {
+    return {
+      name: words.slice(0, -1).join(' '),
+      category: lastWord as Category,
+    };
+  }
+  return { name: text, category: '냉장' };
 }
 
 function escapeHtml(text: string): string {

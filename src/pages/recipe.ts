@@ -1,7 +1,8 @@
-import { getAllIngredients } from '../db';
+import { getAllIngredients, addBookmark, addMeal } from '../db';
 import { streamRecipeSuggestions } from '../gemini';
 import { hasApiKey } from '../settings-store';
 import { navigate } from '../router';
+import type { Bookmark, MealEntry } from '../types';
 
 export function renderRecipe(container: HTMLElement): void {
   container.innerHTML = `
@@ -13,8 +14,10 @@ export function renderRecipe(container: HTMLElement): void {
       </div>
     </div>
     <div class="recipe-actions" id="recipe-actions" style="display:none">
-      <button class="btn btn-outline" id="retry-btn" style="flex:1">🔄 다시 추천</button>
-      <button class="btn btn-primary" id="chat-btn" style="flex:1">💬 이 레시피로 대화</button>
+      <button class="btn btn-outline" id="retry-btn" style="flex:1">🔄 다시</button>
+      <button class="btn btn-primary" id="save-btn" style="flex:1">⭐ 저장</button>
+      <button class="btn btn-primary" id="cook-btn" style="flex:1">📅 해먹음</button>
+      <button class="btn btn-outline" id="chat-btn" style="flex:1">💬 대화</button>
     </div>
   `;
 
@@ -22,6 +25,8 @@ export function renderRecipe(container: HTMLElement): void {
   const output = container.querySelector('#recipe-output')!;
   const actions = container.querySelector('#recipe-actions')!;
   const retryBtn = container.querySelector('#retry-btn')!;
+  const saveBtn = container.querySelector('#save-btn') as HTMLButtonElement;
+  const cookBtn = container.querySelector('#cook-btn') as HTMLButtonElement;
   const chatBtn = container.querySelector('#chat-btn')!;
 
   async function generate() {
@@ -58,4 +63,49 @@ export function renderRecipe(container: HTMLElement): void {
   suggestBtn.addEventListener('click', generate);
   retryBtn.addEventListener('click', generate);
   chatBtn.addEventListener('click', () => navigate('/chat'));
+
+  // ⭐ 레시피 저장
+  saveBtn.addEventListener('click', async () => {
+    const content = output.textContent?.trim();
+    if (!content) return;
+    const title = extractTitle(content);
+    const bookmark: Bookmark = {
+      id: crypto.randomUUID(),
+      title,
+      content,
+      savedAt: Date.now(),
+    };
+    await addBookmark(bookmark);
+    saveBtn.textContent = '✅ 저장됨';
+    saveBtn.disabled = true;
+    setTimeout(() => { saveBtn.textContent = '⭐ 저장'; saveBtn.disabled = false; }, 2000);
+  });
+
+  // 📅 오늘 해먹음
+  cookBtn.addEventListener('click', async () => {
+    const content = output.textContent?.trim();
+    if (!content) return;
+    const title = extractTitle(content);
+    const today = new Date();
+    const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const meal: MealEntry = {
+      id: crypto.randomUUID(),
+      date: dateStr,
+      title,
+      createdAt: Date.now(),
+    };
+    await addMeal(meal);
+    cookBtn.textContent = '✅ 기록됨';
+    cookBtn.disabled = true;
+    setTimeout(() => { cookBtn.textContent = '📅 해먹음'; cookBtn.disabled = false; }, 2000);
+  });
+}
+
+function extractTitle(content: string): string {
+  const lines = content.split('\n').filter((l) => l.trim());
+  for (const line of lines) {
+    const cleaned = line.replace(/^[#\s*\-\d.]+/, '').trim();
+    if (cleaned.length > 2 && cleaned.length < 50) return cleaned;
+  }
+  return '레시피';
 }

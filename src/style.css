@@ -487,6 +487,228 @@ body {
   75% { content: '...'; }
 }
 
+/* Voice Input */
+.btn-voice {
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: var(--bg-input);
+  font-size: 18px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+
+.btn-voice.listening {
+  background: var(--danger);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239,83,80,0.4); }
+  50% { transform: scale(1.05); box-shadow: 0 0 0 8px rgba(239,83,80,0); }
+}
+
+.voice-status {
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+/* Bookmarks */
+.bookmark-card {
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 14px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+
+.bookmark-card:active {
+  transform: scale(0.98);
+}
+
+.bookmark-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.bookmark-date {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.bookmark-content {
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin-top: 10px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.bookmark-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+/* Diary / Calendar */
+.diary-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.diary-header h2 {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.diary-nav-btn {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--bg-card);
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  margin-bottom: 16px;
+}
+
+.calendar-dow {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  padding: 4px 0;
+}
+
+.calendar-day {
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 4px 2px;
+  border-radius: 8px;
+  font-size: 12px;
+  cursor: pointer;
+  background: var(--bg-card);
+  min-height: 44px;
+  transition: background 0.1s;
+}
+
+.calendar-day:active {
+  background: var(--primary-light);
+}
+
+.calendar-day.today {
+  border: 2px solid var(--primary);
+}
+
+.calendar-day.selected {
+  background: var(--primary);
+  color: var(--text-on-primary);
+}
+
+.calendar-day.empty {
+  background: transparent;
+  cursor: default;
+}
+
+.calendar-day-num {
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.calendar-day-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--primary);
+}
+
+.calendar-day.selected .calendar-day-dot {
+  background: var(--text-on-primary);
+}
+
+.day-meals {
+  margin-top: 8px;
+}
+
+.day-meals-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.meal-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  margin-bottom: 8px;
+}
+
+.meal-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.meal-item-title {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.meal-item-memo {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.add-meal-form {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.add-meal-form input {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-input);
+  color: var(--text);
+  font-size: 14px;
+  outline: none;
+}
+
+.add-meal-form input:focus {
+  border-color: var(--primary);
+}
+
 /* Utility */
 .mb-8 { margin-bottom: 8px; }
 .mb-16 { margin-bottom: 16px; }

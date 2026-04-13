@@ -22,6 +22,21 @@ export interface AppSettings {
   geminiModel: string;
 }
 
+export interface Bookmark {
+  id: string;
+  title: string;
+  content: string;
+  savedAt: number;
+}
+
+export interface MealEntry {
+  id: string;
+  date: string;       // 'YYYY-MM-DD'
+  title: string;
+  memo?: string;
+  createdAt: number;
+}
+
 export const DEFAULT_SETTINGS: AppSettings = {
   geminiApiKey: '',
   geminiModel: 'gemini-2.5-flash-lite',
