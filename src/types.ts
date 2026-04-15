@@ -22,6 +22,15 @@ export interface AppSettings {
   geminiModel: string;
 }
 
+export interface Recipe {
+  title: string;
+  difficulty: string;
+  time: string;
+  description: string;
+  ingredients: string[];
+  steps: string[];
+}
+
 export interface Bookmark {
   id: string;
   title: string;

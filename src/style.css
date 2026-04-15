@@ -487,6 +487,141 @@ body {
   75% { content: '...'; }
 }
 
+/* Preference input */
+.preference-section {
+  margin-bottom: 14px;
+}
+
+.preference-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+
+.preference-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-input);
+  color: var(--text);
+  font-size: 14px;
+  font-family: inherit;
+  resize: none;
+  outline: none;
+}
+
+.preference-input:focus {
+  border-color: var(--primary);
+}
+
+.preference-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.chip {
+  padding: 6px 12px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.chip:active {
+  background: var(--primary);
+  color: var(--text-on-primary);
+  border-color: var(--primary);
+}
+
+/* Recipe cards */
+.recipe-card {
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 14px;
+  margin-bottom: 12px;
+}
+
+.recipe-card-header {
+  margin-bottom: 6px;
+}
+
+.recipe-card-title {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.recipe-card-meta {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.recipe-badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--bg-input);
+  color: var(--text-secondary);
+}
+
+.recipe-card-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: 12px;
+}
+
+.recipe-card-detail {
+  padding: 12px;
+  background: var(--bg-input);
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.recipe-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  margin: 8px 0 6px;
+  color: var(--text);
+}
+
+.recipe-section-title:first-child {
+  margin-top: 0;
+}
+
+.recipe-list {
+  padding-left: 20px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text);
+}
+
+.recipe-list li {
+  margin-bottom: 2px;
+}
+
+.recipe-card-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.recipe-card-actions .btn {
+  font-size: 12px;
+  padding: 8px 10px;
+  min-width: 0;
+}
+
 /* Voice Input */
 .btn-voice {
   width: 40px;
