@@ -113,6 +113,11 @@ export async function addMeal(meal: MealEntry): Promise<void> {
   await db.add('meals', meal);
 }
 
+export async function updateMeal(meal: MealEntry): Promise<void> {
+  const db = await getDB();
+  await db.put('meals', meal);
+}
+
 export async function deleteMeal(id: string): Promise<void> {
   const db = await getDB();
   await db.delete('meals', id);

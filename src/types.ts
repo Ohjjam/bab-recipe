@@ -38,12 +38,21 @@ export interface Bookmark {
   savedAt: number;
 }
 
+export interface Nutrition {
+  calories: number; // kcal
+  carbs: number;    // g
+  protein: number;  // g
+  fat: number;      // g
+}
+
 export interface MealEntry {
   id: string;
   date: string;       // 'YYYY-MM-DD'
   title: string;
   memo?: string;
   createdAt: number;
+  nutrition?: Nutrition;
+  nutritionStatus?: 'pending' | 'failed';
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {

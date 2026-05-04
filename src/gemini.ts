@@ -1,5 +1,5 @@
 import { getSettings } from './settings-store';
-import type { Ingredient, ChatMessage, Recipe } from './types';
+import type { Ingredient, ChatMessage, Recipe, Nutrition } from './types';
 
 const BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 
@@ -222,6 +222,62 @@ export async function* streamChat(
   }));
 
   yield* streamGemini(geminiApiKey, geminiModel, contents, systemWithContext);
+}
+
+export async function estimateMealNutrition(title: string, memo?: string): Promise<Nutrition> {
+  const { geminiApiKey, geminiModel } = getSettings();
+  if (!geminiApiKey) throw new Error('API 키가 설정되지 않았습니다.');
+
+  const prompt =
+    `아래 식사 기록의 영양 정보를 한국 일반 가정식 기준으로 추정하세요.\n\n` +
+    `식사 기록: ${title}\n` +
+    (memo ? `메모: ${memo}\n` : '') +
+    `\n【 입력 형태 】\n` +
+    `- 단일 요리일 수도 있고("김치찌개"), 여러 음식을 쉼표/공백으로 나열한 자유 형식일 수도 있음("닭가슴살 한덩이, 김치, 샌드위치", "현미밥 반공기 + 계란 2개").\n` +
+    `- 분량 표현이 모호할 수 있음: "한 덩이", "조금", "반공기", "한 줌", "한 조각" 등 → 일반적인 양으로 합리적으로 가정.\n` +
+    `- 분량 명시가 전혀 없는 단일 요리는 1인분으로 간주.\n\n` +
+    `【 출력 】\n` +
+    `- 기록된 모든 음식의 합계를 칼로리(kcal), 탄수화물(g), 단백질(g), 지방(g)으로 반환.\n` +
+    `- 0 이상의 정수만.`;
+
+  const url = `${BASE_URL}/${geminiModel}:generateContent?key=${geminiApiKey}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig: {
+        temperature: 0.2,
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: 'object',
+          properties: {
+            calories: { type: 'integer' },
+            carbs: { type: 'integer' },
+            protein: { type: 'integer' },
+            fat: { type: 'integer' },
+          },
+          required: ['calories', 'carbs', 'protein', 'fat'],
+        },
+      },
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Gemini API 오류 (${res.status}): ${err}`);
+  }
+
+  const data = await res.json();
+  const jsonText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!jsonText) throw new Error('응답이 비어있습니다');
+  const parsed = JSON.parse(jsonText) as Nutrition;
+  return {
+    calories: Math.max(0, Math.round(parsed.calories || 0)),
+    carbs: Math.max(0, Math.round(parsed.carbs || 0)),
+    protein: Math.max(0, Math.round(parsed.protein || 0)),
+    fat: Math.max(0, Math.round(parsed.fat || 0)),
+  };
 }
 
 export async function testConnection(): Promise<boolean> {

@@ -844,6 +844,96 @@ body {
   border-color: var(--primary);
 }
 
+/* Nutrition summary (daily totals) */
+.nutrition-summary {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  margin-bottom: 10px;
+  border-left: 3px solid var(--primary);
+}
+
+.nutrition-summary-cal {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  flex-shrink: 0;
+}
+
+.nutrition-summary-num {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--primary);
+  line-height: 1.1;
+}
+
+.nutrition-summary-unit {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.nutrition-summary-macros {
+  display: flex;
+  flex: 1;
+  gap: 10px;
+  justify-content: space-around;
+}
+
+.macro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.macro-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.macro-val {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* Per-meal nutrition row */
+.meal-nutrition {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 11px;
+}
+
+.meal-nutrition-cal {
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--primary);
+  color: var(--text-on-primary);
+  font-weight: 600;
+}
+
+.meal-nutrition-macro {
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--bg-input);
+  color: var(--text-secondary);
+}
+
+.meal-nutrition-pending,
+.meal-nutrition-failed {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
 /* Utility */
 .mb-8 { margin-bottom: 8px; }
 .mb-16 { margin-bottom: 16px; }
