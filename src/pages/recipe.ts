@@ -16,6 +16,7 @@ const PREFERENCE_CHIPS = [
 export function renderRecipe(container: HTMLElement): void {
   let recipes: Recipe[] = [];
   let expandedIdx: number | null = null;
+  let invalidRecipesList: { recipe: Recipe; reasons: string[] }[] = [];
 
   container.innerHTML = `
     <div class="preference-section">
@@ -66,15 +67,33 @@ export function renderRecipe(container: HTMLElement): void {
     `;
 
     try {
-      recipes = await getRecipeSuggestions(ingredients, prefInput.value);
+      const result = await getRecipeSuggestions(ingredients, prefInput.value);
+      recipes = result.recipes;
+      invalidRecipesList = result.invalidRecipes;
       expandedIdx = null;
       if (recipes.length === 0) {
-        resultEl.innerHTML = `
+        let errorHtml = `
           <div class="status status-error">
             현재 재료로 만들 수 있는 레시피를 찾지 못했어요.<br>
             재료를 더 추가하거나 요구사항을 완화해주세요.
           </div>
         `;
+        if (invalidRecipesList.length > 0) {
+          errorHtml += `
+            <div class="invalid-recipes-feedback">
+              <div class="feedback-title">💡 이런 레시피를 구상했으나 재료가 부족합니다:</div>
+              <ul class="feedback-list">
+                ${invalidRecipesList.map(ir => `
+                  <li>
+                    <strong class="feedback-recipe-title">${escapeHtml(ir.recipe.title)}</strong>
+                    <div class="feedback-reason">${escapeHtml(ir.reasons.join(' · '))}</div>
+                  </li>
+                `).join('')}
+              </ul>
+            </div>
+          `;
+        }
+        resultEl.innerHTML = errorHtml;
       } else {
         renderRecipes();
       }
@@ -92,7 +111,7 @@ export function renderRecipe(container: HTMLElement): void {
       return;
     }
 
-    resultEl.innerHTML = recipes.map((r, i) => {
+    let html = recipes.map((r, i) => {
       const isExpanded = expandedIdx === i;
       return `
         <div class="recipe-card" data-idx="${i}">
@@ -125,11 +144,37 @@ export function renderRecipe(container: HTMLElement): void {
           </div>
         </div>
       `;
-    }).join('') + `
+    }).join('');
+
+    html += `
       <div style="margin-top:16px">
         <button class="btn btn-outline btn-full" id="chat-btn">💬 이 레시피로 추가 대화</button>
       </div>
     `;
+
+    if (invalidRecipesList.length > 0) {
+      html += `
+        <div class="excluded-recipes-section">
+          <details class="excluded-details">
+            <summary class="excluded-summary">
+              재료 부족으로 제외된 후보 레시피 (${invalidRecipesList.length}개)
+            </summary>
+            <div class="excluded-content">
+              <ul class="feedback-list">
+                ${invalidRecipesList.map(ir => `
+                  <li>
+                    <strong class="feedback-recipe-title">${escapeHtml(ir.recipe.title)}</strong>
+                    <div class="feedback-reason">${escapeHtml(ir.reasons.join(' · '))}</div>
+                  </li>
+                `).join('')}
+              </ul>
+            </div>
+          </details>
+        </div>
+      `;
+    }
+
+    resultEl.innerHTML = html;
 
     const chatBtn = resultEl.querySelector('#chat-btn');
     chatBtn?.addEventListener('click', () => navigate('/chat'));

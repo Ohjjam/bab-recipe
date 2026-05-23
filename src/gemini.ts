@@ -62,33 +62,36 @@ const BASIC_SEASONINGS = [
   '올리고당', '물엿', '맛술', '미림', '굴소스', '참깨', '통깨', '대파',
 ];
 
-// 재료 별칭 — 사용자 재료(왼쪽)는 모델이 별칭(오른쪽) 중 하나로 표기해도 매칭됨
-// 양방향으로 확장됨: '계란' 가진 사용자에게 '달걀'도 매칭, '달걀' 가진 사용자에게 '계란'도 매칭
-const INGREDIENT_ALIASES: Record<string, string[]> = {
-  '다짐육': ['다진 소고기', '다진소고기', '다진 돼지고기', '다진돼지고기', '다진 고기', '다진고기', '간 고기', '간고기', '다진 닭고기', '다진닭고기', '분쇄육', '소고기 다짐육', '돼지고기 다짐육'],
-  '계란': ['달걀'],
-  '달걀': ['계란'],
-  '대파': ['파'],
-  '쪽파': ['파'],
-  '실파': ['파'],
-  '식용유': ['기름', '카놀라유', '포도씨유', '해바라기유'],
-  '올리브유': ['올리브오일'],
-  '버터': ['무염버터', '가염버터'],
-  '치즈': ['모짜렐라', '체다치즈', '슬라이스치즈', '피자치즈'],
-  '우유': ['멸균우유', '저지방우유'],
-  '돼지고기': ['삼겹살', '목살', '앞다리살', '뒷다리살', '돼지 안심', '돼지 등심'],
-  '소고기': ['한우', '우삼겹', '차돌박이', '소 안심', '소 등심', '불고기감'],
-  '닭고기': ['닭가슴살', '닭다리', '닭 안심', '닭 정육'],
-  '두부': ['연두부', '순두부', '부침두부', '찌개두부', '판두부'],
-  '햇반': ['즉석밥', '밥', '쌀밥', '공깃밥'],
-  '밥': ['햇반', '즉석밥', '쌀밥', '공깃밥'],
-  '파스타면': ['스파게티면', '스파게티', '파스타', '링귀니', '페투치니'],
-  '김치': ['묵은지', '배추김치', '신김치'],
-};
+// 재료 별칭 그룹 — 같은 그룹에 있는 재료들은 상호 대체 가능한 동의어로 간주
+const ALIAS_GROUPS: string[][] = [
+  ['다짐육', '다진 소고기', '다진소고기', '다진 돼지고기', '다진돼지고기', '다진 고기', '다진고기', '간 고기', '간고기', '다진 닭고기', '다진닭고기', '분쇄육', '소고기 다짐육', '돼지고기 다짐육'],
+  ['계란', '달걀'],
+  ['대파', '파', '쪽파', '실파'],
+  ['식용유', '기름', '카놀라유', '포도씨유', '해바라기유'],
+  ['올리브유', '올리브오일'],
+  ['버터', '무염버터', '가염버터'],
+  ['치즈', '모짜렐라', '체다치즈', '슬라이스치즈', '피자치즈'],
+  ['우유', '멸균우유', '저지방우유'],
+  ['돼지고기', '삼겹살', '목살', '앞다리살', '뒷다리살', '돼지 안심', '돼지 등심'],
+  ['소고기', '한우', '우삼겹', '차돌박이', '소 안심', '소 등심', '불고기감'],
+  ['닭고기', '닭가슴살', '닭다리', '닭 안심', '닭 정육'],
+  ['두부', '연두부', '순두부', '부침두부', '찌개두부', '판두부'],
+  ['햇반', '즉석밥', '밥', '쌀밥', '공깃밥'],
+  ['파스타면', '스파게티면', '스파게티', '파스타', '링귀니', '페투치니'],
+  ['김치', '묵은지', '배추김치', '신김치'],
+];
+
+// 양방향 별칭 맵 자동 생성
+const ALIAS_MAP: Record<string, string[]> = {};
+for (const group of ALIAS_GROUPS) {
+  for (const item of group) {
+    ALIAS_MAP[item] = [...new Set([...(ALIAS_MAP[item] || []), ...group])];
+  }
+}
 
 function expandWithAliases(name: string): string[] {
   const result = new Set<string>([name]);
-  const aliases = INGREDIENT_ALIASES[name];
+  const aliases = ALIAS_MAP[name];
   if (aliases) {
     for (const a of aliases) result.add(a);
   }
@@ -132,54 +135,89 @@ const COMMON_INGREDIENT_KEYWORDS = [
   '토마토', '베이컨', '햄', '소시지', '참치캔', '스팸',
 ];
 
-// 레시피가 유효한지 검증 (재료 + 제목 둘 다)
-function isRecipeValid(recipe: Recipe, availableNames: string[]): boolean {
+// 레시피가 제외된 구체적인 이유(필수 재료 부족 등)를 반환하는 함수
+export function getRecipeValidationErrors(recipe: Recipe, availableNames: string[]): string[] {
+  const errors: string[] = [];
   const normalizedAvail = availableNames.map(normalizeIngredientName).filter(Boolean);
-  // 사용자 재료 + 별칭 + 양념 모두를 매칭 후보로
   const expandedAvail = normalizedAvail.flatMap(expandWithAliases);
   const candidates = [...expandedAvail, ...BASIC_SEASONINGS];
 
   // 1) ingredients 배열 검증 — 모델이 적은 모든 재료가 사용자/별칭/양념에 매칭되어야 함
+  const missingIngredients: string[] = [];
   for (const raw of recipe.ingredients) {
     const name = normalizeIngredientName(raw);
     if (!name) continue;
-    if (!matchesIngredient(name, candidates)) return false;
+    if (!matchesIngredient(name, candidates)) {
+      missingIngredients.push(raw);
+    }
+  }
+  if (missingIngredients.length > 0) {
+    errors.push(`부족한 재료: ${missingIngredients.join(', ')}`);
   }
 
   // 2) 제목 검증 — 주재료 키워드가 제목에 있는데 사용자 재료(+별칭)에 없으면 탈락
-  //    (1글자 키워드는 오탐 방지를 위해 스킵)
+  const missingTitleKeywords: string[] = [];
   for (const keyword of COMMON_INGREDIENT_KEYWORDS) {
     if (keyword.length < 2) continue;
     if (!recipe.title.includes(keyword)) continue;
     const userHas = expandedAvail.some((n) => n === keyword || n.includes(keyword) || keyword.includes(n));
-    if (!userHas) return false;
+    if (!userHas) {
+      missingTitleKeywords.push(keyword);
+    }
+  }
+  if (missingTitleKeywords.length > 0) {
+    errors.push(`핵심 재료 부족: ${missingTitleKeywords.join(', ')}`);
   }
 
-  return true;
+  return errors;
+}
+
+// 레시피가 유효한지 검증 (재료 + 제목 둘 다)
+function isRecipeValid(recipe: Recipe, availableNames: string[]): boolean {
+  return getRecipeValidationErrors(recipe, availableNames).length === 0;
+}
+
+export interface SuggestionResult {
+  recipes: Recipe[];
+  invalidRecipes: {
+    recipe: Recipe;
+    reasons: string[];
+  }[];
 }
 
 // 구조화된 레시피 3개 반환 (JSON mode). 최대 2회 재시도로 재료 맞는 것만 필터.
 export async function getRecipeSuggestions(
   ingredients: Ingredient[],
   preference?: string
-): Promise<Recipe[]> {
+): Promise<SuggestionResult> {
   const availableNames = ingredients.map((i) => i.name);
   const collected: Recipe[] = [];
+  const invalidRecipes: { recipe: Recipe; reasons: string[] }[] = [];
   const seenTitles = new Set<string>();
 
   for (let attempt = 0; attempt < 3 && collected.length < 3; attempt++) {
     const batch = await fetchRecipes(ingredients, preference, attempt, collected.map((r) => r.title));
     for (const r of batch) {
       if (seenTitles.has(r.title)) continue;
-      if (!isRecipeValid(r, availableNames)) continue;
+      
+      const validationErrors = getRecipeValidationErrors(r, availableNames);
+      if (validationErrors.length > 0) {
+        if (!invalidRecipes.some(ir => ir.recipe.title === r.title)) {
+          invalidRecipes.push({ recipe: r, reasons: validationErrors });
+        }
+        continue;
+      }
+      
       collected.push(r);
       seenTitles.add(r.title);
       if (collected.length >= 3) break;
     }
   }
 
-  // 검증 통과한 레시피만 반환 — 0개면 UI에서 안내 메시지 표시
-  return collected;
+  return {
+    recipes: collected,
+    invalidRecipes,
+  };
 }
 
 async function fetchRecipes(
@@ -206,8 +244,9 @@ async function fetchRecipes(
   // 사용자 재료의 별칭이 있으면 모델에게 알려줘서 표기를 통일하도록 유도
   const aliasHints: string[] = [];
   for (const name of ingredients.map((i) => normalizeIngredientName(i.name))) {
-    if (INGREDIENT_ALIASES[name]) {
-      aliasHints.push(`- "${name}" = ${INGREDIENT_ALIASES[name].slice(0, 4).join(', ')} 등으로 표기 가능 (어느 표기든 같은 재료)`);
+    const aliases = ALIAS_MAP[name]?.filter((a) => a !== name);
+    if (aliases && aliases.length > 0) {
+      aliasHints.push(`- "${name}" = ${aliases.slice(0, 4).join(', ')} 등으로 표기 가능 (어느 표기든 같은 재료)`);
     }
   }
   if (aliasHints.length > 0) {
