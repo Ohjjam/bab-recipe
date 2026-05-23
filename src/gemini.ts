@@ -21,6 +21,12 @@ function buildIngredientsPrompt(ingredients: Ingredient[]): string {
 
 const SYSTEM_INSTRUCTION = `당신은 한국 가정 요리 전문가입니다. 실제로 존재하는 한국 요리를 추천하는 것이 핵심 역할입니다.
 
+【 규칙 0: 사용자 요구사항 최우선 — 최상위 규칙 】
+- 사용자가 "요구사항"을 명시했다면, 추천 3개 중 최소 2개는 그 요구를 직접 충족해야 합니다.
+- 요구사항에 특정 재료 이름이 언급되면(예: "다짐육 써서", "두부로", "삼겹살 요리"), 그 재료가 주재료인 요리를 우선 추천하세요. 그 재료가 안 들어간 요리만 3개 추천하는 것은 금지.
+- 요구사항에 스타일/맛/시간이 언급되면(예: "매콤한 거", "20분 이하", "국물") 그 조건을 따르세요.
+- 요구사항과 재료 제약이 충돌할 때만 재료 제약이 우선. (예: "오징어 요리" 요청인데 오징어 재료 없음 → 오징어 요리 추천 불가, 다른 요리로 대체)
+
 【 규칙 1: 요리 이름은 실제 존재하는 정식 요리명만 】
 - 반드시 실제로 존재하는 정식 요리 이름을 사용하세요.
   예: "제육볶음", "김치찌개", "계란말이", "떡볶이", "된장찌개", "닭갈비", "비빔밥", "김치볶음밥", "미역국", "잡채", "김치전", "콩나물국", "순두부찌개", "부대찌개", "감자조림", "무생채", "어묵볶음", "멸치볶음", "간장계란밥", "참치마요덮밥", "오믈렛", "토마토파스타", "알리오올리오", "크림파스타", "카레라이스", "하이라이스", "계란볶음밥", "돼지고기김치찌개", "오므라이스", "닭볶음탕", "감자채볶음"
@@ -62,7 +68,23 @@ function normalizeIngredientName(raw: string): string {
     .replace(/\s*\d[\d\/.]*\s*(g|kg|ml|l|큰술|작은술|개|쪽|장|줌|컵|포기|모|꼬집|큰\s*술|작은\s*술).*/gi, '')
     .replace(/\s*\(.*?\)\s*/g, '')
     .replace(/\s*(약간|적당량|조금|선택사항)\s*/g, '')
+    .replace(/\s+/g, ' ')
     .trim();
+}
+
+// 모델 재료(name)가 사용자 재료(userIng) 또는 양념과 일치하는지.
+// - 정확 일치는 항상 OK
+// - 사용자 재료가 2글자 이상일 때만 `name.includes(userIng)` 허용
+//   (모델이 "닭가슴살" 적었을 때 사용자가 "닭가슴살"/"닭" 가졌으면 통과시키지 않음 — 즉 사용자→모델 방향 includes는 짧으면 거부)
+// - 반대 방향(`userIng.includes(name)`) 제거: 모델이 모호한 짧은 이름("고기") 적으면 탈락.
+function matchesIngredient(name: string, candidates: string[]): boolean {
+  if (!name) return true;
+  for (const c of candidates) {
+    if (!c) continue;
+    if (name === c) return true;
+    if (c.length >= 2 && name.includes(c)) return true;
+  }
+  return false;
 }
 
 // 제목에 자주 등장하는 주재료 (사용자가 없는데 제목에 들어가면 탈락)
@@ -79,20 +101,22 @@ const COMMON_INGREDIENT_KEYWORDS = [
 
 // 레시피가 유효한지 검증 (재료 + 제목 둘 다)
 function isRecipeValid(recipe: Recipe, availableNames: string[]): boolean {
-  const avail = [...availableNames, ...BASIC_SEASONINGS];
+  const normalizedAvail = availableNames.map(normalizeIngredientName).filter(Boolean);
+  const candidates = [...normalizedAvail, ...BASIC_SEASONINGS];
 
-  // 1) ingredients 배열 검증
+  // 1) ingredients 배열 검증 — 모델이 적은 모든 재료가 사용자/양념에 매칭되어야 함
   for (const raw of recipe.ingredients) {
     const name = normalizeIngredientName(raw);
     if (!name) continue;
-    const found = avail.some((a) => name.includes(a) || a.includes(name));
-    if (!found) return false;
+    if (!matchesIngredient(name, candidates)) return false;
   }
 
   // 2) 제목 검증 — 주재료 키워드가 제목에 있는데 사용자 재료에 없으면 탈락
+  //    (1글자 키워드는 오탐 방지를 위해 스킵)
   for (const keyword of COMMON_INGREDIENT_KEYWORDS) {
+    if (keyword.length < 2) continue;
     if (!recipe.title.includes(keyword)) continue;
-    const userHas = availableNames.some((n) => n.includes(keyword) || keyword.includes(n));
+    const userHas = normalizedAvail.some((n) => n === keyword || n.includes(keyword));
     if (!userHas) return false;
   }
 
@@ -108,7 +132,7 @@ export async function getRecipeSuggestions(
   const collected: Recipe[] = [];
   const seenTitles = new Set<string>();
 
-  for (let attempt = 0; attempt < 2 && collected.length < 3; attempt++) {
+  for (let attempt = 0; attempt < 3 && collected.length < 3; attempt++) {
     const batch = await fetchRecipes(ingredients, preference, attempt, collected.map((r) => r.title));
     for (const r of batch) {
       if (seenTitles.has(r.title)) continue;
@@ -119,10 +143,7 @@ export async function getRecipeSuggestions(
     }
   }
 
-  // 3개 못 채우면 그냥 필터 통과한 것만 반환 (최소 1개 보장 위해 빈 배열이면 마지막 batch 반환)
-  if (collected.length === 0) {
-    return await fetchRecipes(ingredients, preference, 0, []);
-  }
+  // 검증 통과한 레시피만 반환 — 0개면 UI에서 안내 메시지 표시
   return collected;
 }
 
@@ -138,18 +159,24 @@ async function fetchRecipes(
   const ingredientsText = buildIngredientsPrompt(ingredients);
   const availableNames = ingredients.map((i) => i.name).join(', ');
 
-  let prompt = `${ingredientsText}\n\n`;
+  let prompt = '';
+  if (preference && preference.trim()) {
+    prompt += `🎯【 사용자 요구사항 — 최우선 】\n"${preference.trim()}"\n\n`;
+    prompt += `위 요구사항이 추천의 가장 중요한 기준입니다. 3개 중 최소 2개는 이 요구를 직접 충족해야 합니다.\n`;
+    prompt += `특정 재료가 언급되어 있고 그 재료가 아래 "사용 가능한 재료"에 있다면, 그 재료가 주재료인 요리를 우선 추천하세요.\n\n`;
+  }
+  prompt += `${ingredientsText}\n\n`;
   prompt += `【 사용 가능한 재료 (이것 외에는 기본 양념만 사용 가능) 】\n${availableNames}\n\n`;
   prompt += `【 기본 양념 (위 목록에 없어도 자유롭게 사용 가능) 】\n소금, 설탕, 간장, 고추장, 된장, 식초, 식용유, 참기름, 들기름, 후추, 다진마늘, 물, 고춧가루\n\n`;
   prompt += `위 재료만으로 만들 수 있는 실제 한국/가정 요리 3가지를 추천하세요.\n\n`;
   prompt += `반드시 답변 전에 내부적으로 다음 체크리스트를 확인하세요:\n`;
+  if (preference && preference.trim()) {
+    prompt += `0) 사용자 요구사항을 3개 중 최소 2개의 추천이 직접 충족하는가? (특정 재료 언급 시 그 재료가 들어간 요리 포함)\n`;
+  }
   prompt += `1) 추천하는 요리 이름이 실제 존재하는 정식 요리 이름인가? (재료 나열식 이름 아님)\n`;
   prompt += `2) 요리 이름에 있는 재료가 모두 "사용 가능한 재료" 목록에 있는가?\n`;
   prompt += `3) ingredients 배열의 모든 재료가 "사용 가능한 재료" 또는 "기본 양념"에 있는가?\n`;
-  prompt += `셋 중 하나라도 No면, 그 요리 대신 다른 요리를 고르세요.\n\n`;
-  if (preference && preference.trim()) {
-    prompt += `【 사용자 요구사항 】 ${preference.trim()}\n\n`;
-  }
+  prompt += `하나라도 No면, 그 요리 대신 다른 요리를 고르세요.\n\n`;
   if (excludeTitles.length > 0) {
     prompt += `【 이미 추천된 요리 (제외) 】 ${excludeTitles.join(', ')}\n\n`;
   }
@@ -166,7 +193,7 @@ async function fetchRecipes(
       system_instruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       generationConfig: {
-        temperature: 0.5,
+        temperature: 0.4,
         responseMimeType: 'application/json',
         responseSchema: {
           type: 'object',

@@ -68,7 +68,16 @@ export function renderRecipe(container: HTMLElement): void {
     try {
       recipes = await getRecipeSuggestions(ingredients, prefInput.value);
       expandedIdx = null;
-      renderRecipes();
+      if (recipes.length === 0) {
+        resultEl.innerHTML = `
+          <div class="status status-error">
+            현재 재료로 만들 수 있는 레시피를 찾지 못했어요.<br>
+            재료를 더 추가하거나 요구사항을 완화해주세요.
+          </div>
+        `;
+      } else {
+        renderRecipes();
+      }
     } catch (err) {
       resultEl.innerHTML = `<div class="status status-error">오류: ${(err as Error).message}</div>`;
     } finally {
