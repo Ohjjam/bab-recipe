@@ -26,6 +26,15 @@ export function renderRecipe(container: HTMLElement): void {
         ${PREFERENCE_CHIPS.map((c) => `<button type="button" class="chip" data-chip="${c}">${c}</button>`).join('')}
       </div>
     </div>
+    <div class="settings-group mb-16">
+      <label class="preference-label">식사 분량</label>
+      <select class="settings-select" id="serving-select">
+        <option value="1인분" selected>1인분 기준</option>
+        <option value="2인분">2인분 기준</option>
+        <option value="3~4인분">3~4인분 기준</option>
+        <option value="5인분 이상">5인분 이상 기준</option>
+      </select>
+    </div>
     <button class="btn btn-primary btn-full mb-16" id="suggest-btn">🍳 레시피 추천받기</button>
     <div id="recipe-result"></div>
   `;
@@ -34,6 +43,7 @@ export function renderRecipe(container: HTMLElement): void {
   const chipsEl = container.querySelector('#pref-chips')!;
   const suggestBtn = container.querySelector('#suggest-btn') as HTMLButtonElement;
   const resultEl = container.querySelector('#recipe-result') as HTMLElement;
+  const servingSelect = container.querySelector('#serving-select') as HTMLSelectElement;
 
   // Chip click — append to preference input
   chipsEl.addEventListener('click', (e) => {
@@ -60,14 +70,19 @@ export function renderRecipe(container: HTMLElement): void {
     suggestBtn.disabled = true;
     suggestBtn.textContent = '추천 중...';
     resultEl.innerHTML = `
-      <div class="empty-state">
-        <div class="empty-state-icon">⏳</div>
-        <div class="empty-state-text loading-dots">레시피를 만들고 있어요</div>
+      <div class="cooking-loader">
+        <div class="loader-pot">🍳</div>
+        <div class="loader-steam">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+        <div class="loading-dots" style="font-size:14px;color:var(--text-secondary);font-weight:500;">AI가 냉장고 재료로 레시피를 맛있게 요리하고 있어요</div>
       </div>
     `;
 
     try {
-      const result = await getRecipeSuggestions(ingredients, prefInput.value);
+      const result = await getRecipeSuggestions(ingredients, prefInput.value, servingSelect.value);
       recipes = result.recipes;
       invalidRecipesList = result.invalidRecipes;
       expandedIdx = null;
@@ -125,7 +140,7 @@ export function renderRecipe(container: HTMLElement): void {
           <div class="recipe-card-desc">${escapeHtml(r.description)}</div>
           ${isExpanded ? `
             <div class="recipe-card-detail">
-              <div class="recipe-section-title">필요한 재료</div>
+              <div class="recipe-section-title">필요한 재료 (${servingSelect.value} 기준)</div>
               <ul class="recipe-list">
                 ${r.ingredients.map((x) => `<li>${escapeHtml(x)}</li>`).join('')}
               </ul>
@@ -135,12 +150,16 @@ export function renderRecipe(container: HTMLElement): void {
               </ol>
             </div>
           ` : ''}
-          <div class="recipe-card-actions">
-            <button class="btn btn-outline" data-toggle="${i}" style="flex:1">
+          <div class="recipe-card-actions" style="margin-top: 10px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px;">
+            <button class="btn btn-outline" data-toggle="${i}">
               ${isExpanded ? '접기' : '자세히 보기'}
             </button>
-            <button class="btn btn-primary" data-save="${i}" style="flex:1">⭐ 저장</button>
-            <button class="btn btn-primary" data-cook="${i}" style="flex:1">📅 해먹음</button>
+            <button class="btn btn-outline" data-start="${i}">⏱️ 요리 시작</button>
+            <button class="btn btn-primary" data-save="${i}">⭐ 저장</button>
+            <button class="btn btn-primary" data-cook="${i}">📅 해먹음</button>
+          </div>
+          <div style="margin-top: 6px; display: flex; justify-content: flex-end;">
+            <button class="btn btn-outline btn-sm" data-share="${i}" style="padding: 4px 8px; font-size:11px;">🔗 레시피 공유</button>
           </div>
         </div>
       `;
@@ -157,7 +176,7 @@ export function renderRecipe(container: HTMLElement): void {
         <div class="excluded-recipes-section">
           <details class="excluded-details">
             <summary class="excluded-summary">
-              재료 부족으로 제외된 후보 레시피 (${invalidRecipesList.length}개)
+              재료 부족 또는 기피 재료로 제외된 후보 레시피 (${invalidRecipesList.length}개)
             </summary>
             <div class="excluded-content">
               <ul class="feedback-list">
@@ -191,6 +210,13 @@ export function renderRecipe(container: HTMLElement): void {
       return;
     }
 
+    const startBtn = target.closest('[data-start]') as HTMLElement | null;
+    if (startBtn) {
+      const idx = parseInt(startBtn.dataset.start!);
+      openCookingGuide(recipes[idx]);
+      return;
+    }
+
     const saveBtn = target.closest('[data-save]') as HTMLButtonElement | null;
     if (saveBtn) {
       const idx = parseInt(saveBtn.dataset.save!);
@@ -220,6 +246,27 @@ export function renderRecipe(container: HTMLElement): void {
       };
       await addMeal(meal);
       flashButton(cookBtn, '✅ 기록됨', '📅 해먹음');
+      return;
+    }
+
+    const shareBtn = target.closest('[data-share]') as HTMLButtonElement | null;
+    if (shareBtn) {
+      const idx = parseInt(shareBtn.dataset.share!);
+      const recipe = recipes[idx];
+      const text = formatRecipe(recipe);
+      if (navigator.share) {
+        try {
+          await navigator.share({
+            title: recipe.title,
+            text: text,
+          });
+        } catch {
+          // ignore abort
+        }
+      } else {
+        await navigator.clipboard.writeText(text);
+        alert('레시피가 클립보드에 복사되었습니다! 🔗');
+      }
       return;
     }
   });
@@ -265,3 +312,171 @@ function escapeHtml(text: string): string {
   div.textContent = text;
   return div.innerHTML;
 }
+
+// --- Step-by-step Cooking Guide overlay & timer ---
+
+function extractTimeFromStep(step: string): number | null {
+  const hourMatch = step.match(/(\d+)\s*시간/);
+  const minMatch = step.match(/(\d+)\s*분/);
+  const secMatch = step.match(/(\d+)\s*초/);
+  
+  if (!hourMatch && !minMatch && !secMatch) return null;
+  
+  let totalSeconds = 0;
+  if (hourMatch) totalSeconds += parseInt(hourMatch[1]) * 3600;
+  if (minMatch) totalSeconds += parseInt(minMatch[1]) * 60;
+  if (secMatch) totalSeconds += parseInt(secMatch[1]);
+  
+  return totalSeconds;
+}
+
+function playBeep() {
+  try {
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, ctx.currentTime); // A5 note
+    gain.gain.setValueAtTime(0, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(0.5, ctx.currentTime + 0.05);
+    gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.5);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.5);
+  } catch (err) {
+    console.error('Audio play failed:', err);
+  }
+}
+
+function openCookingGuide(recipe: Recipe) {
+  let currentStep = 0;
+  let timerId: any = null;
+  let timerSeconds = 0;
+  let isTimerRunning = false;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'cooking-guide-overlay';
+  document.body.appendChild(overlay);
+
+  function renderGuideStep() {
+    const stepText = recipe.steps[currentStep];
+    const totalSteps = recipe.steps.length;
+    const extractedSeconds = extractTimeFromStep(stepText);
+
+    // Clean up active timer when switching steps
+    if (timerId) {
+      clearInterval(timerId);
+      timerId = null;
+    }
+    isTimerRunning = false;
+
+    overlay.innerHTML = `
+      <header class="cooking-guide-header">
+        <button class="cooking-guide-close" id="guide-close">✕</button>
+        <div class="cooking-guide-title">${escapeHtml(recipe.title)}</div>
+        <div style="width:20px"></div>
+      </header>
+      <div class="cooking-guide-content">
+        <div class="cooking-step-card">
+          <div class="cooking-step-num">Step ${currentStep + 1} / ${totalSteps}</div>
+          <div class="cooking-step-text">${escapeHtml(stepText)}</div>
+        </div>
+        
+        ${extractedSeconds !== null ? `
+          <div class="timer-container">
+            <div class="timer-display" id="timer-display">${formatDuration(extractedSeconds)}</div>
+            <div class="timer-actions">
+              <button class="btn btn-primary btn-sm" id="timer-start-btn">시작</button>
+              <button class="btn btn-outline btn-sm" id="timer-reset-btn">리셋</button>
+            </div>
+          </div>
+        ` : ''}
+      </div>
+      <footer class="cooking-guide-footer">
+        <button class="btn btn-outline" id="guide-prev" style="flex:1" ${currentStep === 0 ? 'disabled' : ''}>이전</button>
+        <button class="btn btn-primary" id="guide-next" style="flex:2">
+          ${currentStep === totalSteps - 1 ? '완료' : '다음 단계'}
+        </button>
+      </footer>
+    `;
+
+    // Bind event listeners
+    overlay.querySelector('#guide-close')!.addEventListener('click', closeGuide);
+    overlay.querySelector('#guide-prev')!.addEventListener('click', () => {
+      if (currentStep > 0) {
+        currentStep--;
+        renderGuideStep();
+      }
+    });
+    overlay.querySelector('#guide-next')!.addEventListener('click', () => {
+      if (currentStep < totalSteps - 1) {
+        currentStep++;
+        renderGuideStep();
+      } else {
+        closeGuide();
+      }
+    });
+
+    if (extractedSeconds !== null) {
+      timerSeconds = extractedSeconds;
+      const displayEl = overlay.querySelector('#timer-display')!;
+      const startBtn = overlay.querySelector('#timer-start-btn') as HTMLButtonElement;
+      const resetBtn = overlay.querySelector('#timer-reset-btn')!;
+
+      startBtn.addEventListener('click', () => {
+        if (isTimerRunning) {
+          // Pause
+          clearInterval(timerId);
+          timerId = null;
+          isTimerRunning = false;
+          startBtn.textContent = '시작';
+        } else {
+          // Start
+          isTimerRunning = true;
+          startBtn.textContent = '일시정지';
+          timerId = setInterval(() => {
+            timerSeconds--;
+            displayEl.textContent = formatDuration(timerSeconds);
+            if (timerSeconds <= 0) {
+              clearInterval(timerId);
+              timerId = null;
+              isTimerRunning = false;
+              startBtn.textContent = '시작';
+              startBtn.disabled = true;
+              playBeep();
+              if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+              alert('시간이 다 되었습니다! 🍳');
+            }
+          }, 1000);
+        }
+      });
+
+      resetBtn.addEventListener('click', () => {
+        if (timerId) {
+          clearInterval(timerId);
+          timerId = null;
+        }
+        isTimerRunning = false;
+        timerSeconds = extractedSeconds;
+        displayEl.textContent = formatDuration(timerSeconds);
+        startBtn.textContent = '시작';
+        startBtn.disabled = false;
+      });
+    }
+  }
+
+  function formatDuration(sec: number): string {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  }
+
+  function closeGuide() {
+    if (timerId) clearInterval(timerId);
+    overlay.remove();
+  }
+
+  renderGuideStep();
+}
+

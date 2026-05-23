@@ -1,6 +1,6 @@
 :root {
   --primary: #4CAF50;
-  --primary-light: #81C784;
+  --primary-light: #e8f5e9;
   --primary-dark: #388E3C;
   --bg: #FAFAF5;
   --bg-card: #FFFFFF;
@@ -18,7 +18,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #1A1A1A;
     --bg-card: #2C2C2C;
     --bg-input: #333333;
@@ -27,7 +27,32 @@
     --border: #404040;
     --danger-bg: #3E2723;
     --shadow: 0 1px 3px rgba(0,0,0,0.3);
+    --primary-light: #2C3E2C;
   }
+}
+
+:root[data-theme="dark"] {
+  --bg: #1A1A1A;
+  --bg-card: #2C2C2C;
+  --bg-input: #333333;
+  --text: #E0E0E0;
+  --text-secondary: #9E9E9E;
+  --border: #404040;
+  --danger-bg: #3E2723;
+  --shadow: 0 1px 3px rgba(0,0,0,0.3);
+  --primary-light: #2C3E2C;
+}
+
+:root[data-theme="light"] {
+  --bg: #FAFAF5;
+  --bg-card: #FFFFFF;
+  --bg-input: #F5F5F0;
+  --text: #212121;
+  --text-secondary: #757575;
+  --border: #E0E0E0;
+  --danger-bg: #FFEBEE;
+  --shadow: 0 1px 3px rgba(0,0,0,0.1);
+  --primary-light: #e8f5e9;
 }
 
 * {
@@ -1032,4 +1057,393 @@ body {
   max-height: 250px;
   overflow-y: auto;
 }
+
+/* Expiry Date Badges */
+.expiry-badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 600;
+  margin-left: 6px;
+  flex-shrink: 0;
+}
+.expiry-badge.expired {
+  background: var(--danger);
+  color: var(--text-on-primary);
+}
+.expiry-badge.today {
+  background: #FF9800;
+  color: white;
+}
+.expiry-badge.warning {
+  background: #FFC107;
+  color: #212121;
+}
+.expiry-badge.normal {
+  background: var(--primary-light);
+  color: var(--primary-dark);
+}
+
+/* Inline Edit Form */
+.edit-item-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: 100%;
+  padding: 8px;
+  background: var(--bg-input);
+  border-radius: 8px;
+  margin-top: 4px;
+}
+.edit-item-form input[type="text"] {
+  flex: 1;
+  min-width: 100px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-card);
+  color: var(--text);
+  font-size: 13px;
+}
+.edit-item-form input[type="date"] {
+  width: 120px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-card);
+  color: var(--text);
+  font-size: 13px;
+}
+.edit-item-form select {
+  width: 80px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-card);
+  color: var(--text);
+  font-size: 13px;
+}
+.edit-item-form .form-actions {
+  display: flex;
+  gap: 4px;
+  width: 100%;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+.btn-sm {
+  padding: 4px 8px !important;
+  font-size: 11px !important;
+}
+
+/* Cooking Pot Loading Animation */
+.cooking-loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+}
+.loader-pot {
+  font-size: 56px;
+  animation: wobble 1s ease-in-out infinite;
+  display: inline-block;
+}
+.loader-steam {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+  height: 20px;
+}
+.loader-steam span {
+  width: 4px;
+  height: 12px;
+  background: var(--text-secondary);
+  border-radius: 2px;
+  opacity: 0;
+  animation: steam 1.5s ease-in-out infinite;
+}
+.loader-steam span:nth-child(1) { animation-delay: 0.1s; }
+.loader-steam span:nth-child(2) { animation-delay: 0.5s; }
+.loader-steam span:nth-child(3) { animation-delay: 0.9s; }
+
+@keyframes wobble {
+  0%, 100% { transform: rotate(-5deg); }
+  50% { transform: rotate(5deg) translateY(-4px); }
+}
+@keyframes steam {
+  0% { transform: translateY(10px) scaleX(0.5); opacity: 0; }
+  50% { opacity: 0.5; }
+  100% { transform: translateY(-10px) scaleX(1.5); opacity: 0; }
+}
+
+/* Cooking Guide Overlay */
+.cooking-guide-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--bg);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  max-width: 480px;
+  margin: 0 auto;
+  left: 50%;
+  transform: translateX(-50%);
+  box-shadow: 0 0 20px rgba(0,0,0,0.2);
+}
+.cooking-guide-header {
+  height: var(--header-height);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-card);
+}
+.cooking-guide-title {
+  font-weight: 700;
+  font-size: 16px;
+}
+.cooking-guide-close {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: var(--text);
+}
+.cooking-guide-content {
+  flex: 1;
+  padding: 24px 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  overflow-y: auto;
+}
+.cooking-step-card {
+  width: 100%;
+  background: var(--bg-card);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: var(--shadow);
+  text-align: center;
+  margin-bottom: 24px;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.cooking-step-num {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--primary);
+  text-transform: uppercase;
+  margin-bottom: 12px;
+  letter-spacing: 1px;
+}
+.cooking-step-text {
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 1.6;
+  color: var(--text);
+  word-break: keep-all;
+}
+.timer-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 16px;
+  padding: 16px;
+  background: var(--bg-input);
+  border-radius: 12px;
+  width: 100%;
+  max-width: 280px;
+}
+.timer-display {
+  font-size: 32px;
+  font-weight: 700;
+  font-family: monospace;
+  color: var(--primary);
+  margin-bottom: 12px;
+}
+.timer-actions {
+  display: flex;
+  gap: 8px;
+}
+.cooking-guide-footer {
+  padding: 16px;
+  display: flex;
+  gap: 12px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-card);
+}
+
+/* Diary / Nutrition Goals */
+.progress-bar-container {
+  width: 100%;
+  height: 6px;
+  background: var(--bg-input);
+  border-radius: 3px;
+  margin-top: 8px;
+  overflow: hidden;
+}
+.progress-bar {
+  height: 100%;
+  background: var(--primary);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+.nutrition-summary-cal {
+  width: 110px;
+}
+.macro-progress-container {
+  width: 100%;
+  margin-top: 4px;
+}
+
+/* Manual Nutrition Edit Form */
+.edit-nutrition-form {
+  width: 100%;
+  padding: 12px;
+  background: var(--bg-input);
+  border-radius: 8px;
+  margin-top: 8px;
+}
+.edit-nutrition-form .form-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.edit-nutrition-form .form-grid div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.edit-nutrition-form label {
+  font-size: 10px;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+.edit-nutrition-form input {
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-card);
+  color: var(--text);
+  font-size: 12px;
+  text-align: center;
+}
+.edit-nutrition-form .form-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+.meal-item-edit-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Monthly Stats Dashboard */
+.monthly-stats-section {
+  margin-top: 16px;
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.monthly-stats-summary {
+  padding: 12px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+  outline: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.monthly-stats-summary:hover {
+  background-color: var(--bg-input);
+}
+.monthly-stats-section[open] .monthly-stats-summary {
+  border-bottom: 1px solid var(--border);
+}
+.monthly-stats-content {
+  padding: 16px;
+}
+.stats-row {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 16px;
+  text-align: center;
+}
+.stat-card {
+  flex: 1;
+}
+.stat-val {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--primary);
+}
+.stat-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+.macro-ratio-bar {
+  display: flex;
+  height: 24px;
+  border-radius: 12px;
+  overflow: hidden;
+  margin: 12px 0;
+  background: var(--bg-input);
+}
+.macro-ratio-segment {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  transition: width 0.3s ease;
+}
+.macro-ratio-legend {
+  display: flex;
+  justify-content: space-around;
+  font-size: 11px;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.legend-color {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+.legend-color.carbs { background: #4CAF50; }
+.legend-color.protein { background: #2196F3; }
+.legend-color.fat { background: #FFC107; }
+
+/* Custom Scrollbar for Guide Modal */
+.cooking-guide-content::-webkit-scrollbar {
+  width: 6px;
+}
+.cooking-guide-content::-webkit-scrollbar-thumb {
+  background-color: var(--border);
+  border-radius: 3px;
+}
+
 

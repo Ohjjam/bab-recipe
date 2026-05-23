@@ -8,6 +8,7 @@ export interface Ingredient {
   category: Category;
   addedAt: number;
   memo?: string;
+  expiryDate?: string; // 'YYYY-MM-DD'
 }
 
 export interface ChatMessage {
@@ -20,6 +21,12 @@ export interface ChatMessage {
 export interface AppSettings {
   geminiApiKey: string;
   geminiModel: string;
+  excludedIngredients: string; // Comma-separated list of ingredients to exclude
+  targetCalories: number;
+  targetCarbs: number;
+  targetProtein: number;
+  targetFat: number;
+  theme: 'system' | 'light' | 'dark';
 }
 
 export interface Recipe {
@@ -58,4 +65,10 @@ export interface MealEntry {
 export const DEFAULT_SETTINGS: AppSettings = {
   geminiApiKey: '',
   geminiModel: 'gemini-2.5-flash-lite',
+  excludedIngredients: '',
+  targetCalories: 2000,
+  targetCarbs: 250,
+  targetProtein: 100,
+  targetFat: 60,
+  theme: 'system',
 };

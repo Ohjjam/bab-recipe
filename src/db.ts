@@ -45,16 +45,19 @@ export async function getIngredientsByCategory(category: string): Promise<Ingred
 export async function addIngredient(ingredient: Ingredient): Promise<void> {
   const db = await getDB();
   await db.add('ingredients', ingredient);
+  void triggerAutoBackup();
 }
 
 export async function deleteIngredient(id: string): Promise<void> {
   const db = await getDB();
   await db.delete('ingredients', id);
+  void triggerAutoBackup();
 }
 
 export async function updateIngredient(ingredient: Ingredient): Promise<void> {
   const db = await getDB();
   await db.put('ingredients', ingredient);
+  void triggerAutoBackup();
 }
 
 // --- Chat History ---
@@ -86,11 +89,13 @@ export async function getAllBookmarks(): Promise<Bookmark[]> {
 export async function addBookmark(bookmark: Bookmark): Promise<void> {
   const db = await getDB();
   await db.add('bookmarks', bookmark);
+  void triggerAutoBackup();
 }
 
 export async function deleteBookmark(id: string): Promise<void> {
   const db = await getDB();
   await db.delete('bookmarks', id);
+  void triggerAutoBackup();
 }
 
 // --- Meals ---
@@ -111,14 +116,79 @@ export async function getMealsByMonth(year: number, month: number): Promise<Meal
 export async function addMeal(meal: MealEntry): Promise<void> {
   const db = await getDB();
   await db.add('meals', meal);
+  void triggerAutoBackup();
 }
 
 export async function updateMeal(meal: MealEntry): Promise<void> {
   const db = await getDB();
   await db.put('meals', meal);
+  void triggerAutoBackup();
 }
 
 export async function deleteMeal(id: string): Promise<void> {
   const db = await getDB();
   await db.delete('meals', id);
+  void triggerAutoBackup();
+}
+
+// --- Backup & Restore ---
+
+export async function triggerAutoBackup(): Promise<void> {
+  try {
+    const dataStr = await exportAllData();
+    localStorage.setItem('bab-recipe-auto-backup', dataStr);
+  } catch (err) {
+    console.error('Auto backup failed:', err);
+  }
+}
+
+export async function exportAllData(): Promise<string> {
+  const db = await getDB();
+  const ingredients = await db.getAll('ingredients');
+  const bookmarks = await db.getAll('bookmarks');
+  const meals = await db.getAll('meals');
+  const chatHistory = await db.getAll('chat-history');
+  const settings = localStorage.getItem('bab-recipe-settings');
+  
+  return JSON.stringify({
+    ingredients,
+    bookmarks,
+    meals,
+    chatHistory,
+    settings: settings ? JSON.parse(settings) : null,
+    exportedAt: Date.now()
+  });
+}
+
+export async function importAllData(jsonStr: string): Promise<void> {
+  const data = JSON.parse(jsonStr);
+  const db = await getDB();
+  
+  const tx = db.transaction(['ingredients', 'bookmarks', 'meals', 'chat-history'], 'readwrite');
+  
+  await tx.objectStore('ingredients').clear();
+  for (const item of data.ingredients || []) {
+    await tx.objectStore('ingredients').put(item);
+  }
+  
+  await tx.objectStore('bookmarks').clear();
+  for (const item of data.bookmarks || []) {
+    await tx.objectStore('bookmarks').put(item);
+  }
+  
+  await tx.objectStore('meals').clear();
+  for (const item of data.meals || []) {
+    await tx.objectStore('meals').put(item);
+  }
+  
+  await tx.objectStore('chat-history').clear();
+  for (const item of data.chatHistory || []) {
+    await tx.objectStore('chat-history').put(item);
+  }
+  
+  await tx.done;
+  
+  if (data.settings) {
+    localStorage.setItem('bab-recipe-settings', JSON.stringify(data.settings));
+  }
 }

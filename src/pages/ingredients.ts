@@ -1,15 +1,17 @@
-import { getAllIngredients, getIngredientsByCategory, addIngredient, deleteIngredient } from '../db';
+import { getAllIngredients, getIngredientsByCategory, addIngredient, deleteIngredient, updateIngredient } from '../db';
 import { subscribe, emit, EVENTS } from '../state';
 import { CATEGORIES, type Category, type Ingredient } from '../types';
 
 export function renderIngredients(container: HTMLElement): () => void {
   let activeCategory: Category | '전체' = '전체';
+  let editingId: string | null = null;
 
   container.innerHTML = `
     <div class="category-tabs" id="cat-tabs"></div>
     <form class="add-form" id="add-form">
       <input type="text" id="add-name" placeholder="재료 이름" autocomplete="off" required />
-      <input type="text" id="add-memo" placeholder="메모" style="width:80px" />
+      <input type="text" id="add-memo" placeholder="메모" style="width:70px" />
+      <input type="date" id="add-expiry" title="유통기한" style="width:115px; font-size:12px; padding: 4px 6px" />
       <select id="add-cat">
         ${CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('')}
       </select>
@@ -25,6 +27,7 @@ export function renderIngredients(container: HTMLElement): () => void {
   const form = container.querySelector('#add-form') as HTMLFormElement;
   const nameInput = container.querySelector('#add-name') as HTMLInputElement;
   const memoInput = container.querySelector('#add-memo') as HTMLInputElement;
+  const expiryInput = container.querySelector('#add-expiry') as HTMLInputElement;
   const catSelect = container.querySelector('#add-cat') as HTMLSelectElement;
   const voiceBtn = container.querySelector('#voice-btn') as HTMLButtonElement;
   const voiceStatus = container.querySelector('#voice-status') as HTMLElement;
@@ -114,6 +117,16 @@ export function renderIngredients(container: HTMLElement): () => void {
       ? await getAllIngredients()
       : await getIngredientsByCategory(activeCategory);
 
+    // Sort: expiryDate ascending (closest first), then items without expiryDate by addedAt descending
+    items.sort((a, b) => {
+      if (a.expiryDate && b.expiryDate) {
+        return a.expiryDate.localeCompare(b.expiryDate);
+      }
+      if (a.expiryDate) return -1;
+      if (b.expiryDate) return 1;
+      return b.addedAt - a.addedAt;
+    });
+
     if (items.length === 0) {
       listEl.innerHTML = `
         <div class="empty-state">
@@ -124,16 +137,49 @@ export function renderIngredients(container: HTMLElement): () => void {
       return;
     }
 
-    listEl.innerHTML = items.map(item => `
-      <div class="ingredient-item" data-id="${item.id}">
-        <div class="ingredient-info">
-          <div class="ingredient-name">${escapeHtml(item.name)}</div>
-          <div class="ingredient-meta">${item.memo ? escapeHtml(item.memo) + ' · ' : ''}${timeAgo(item.addedAt)}</div>
+    listEl.innerHTML = items.map(item => {
+      if (editingId === item.id) {
+        return `
+          <div class="ingredient-item editing" data-id="${item.id}" style="flex-direction: column; align-items: stretch; gap: 8px;">
+            <form class="edit-item-form" data-id="${item.id}">
+              <div style="display:flex; gap: 6px; width: 100%">
+                <input type="text" class="edit-name" value="${escapeHtml(item.name)}" style="flex:2" required />
+                <input type="text" class="edit-memo" value="${escapeHtml(item.memo || '')}" placeholder="메모" style="flex:1" />
+              </div>
+              <div style="display:flex; gap: 6px; width: 100%; align-items: center;">
+                <input type="date" class="edit-expiry" value="${item.expiryDate || ''}" style="flex:1.5" />
+                <select class="edit-cat" style="flex:1">
+                  ${CATEGORIES.map(c => `<option value="${c}" ${c === item.category ? 'selected' : ''}>${c}</option>`).join('')}
+                </select>
+              </div>
+              <div class="form-actions" style="margin-top: 4px;">
+                <button type="submit" class="btn btn-primary btn-sm">저장</button>
+                <button type="button" class="btn btn-outline btn-sm edit-cancel">취소</button>
+              </div>
+            </form>
+          </div>
+        `;
+      }
+
+      return `
+        <div class="ingredient-item" data-id="${item.id}">
+          <div class="ingredient-info">
+            <div class="ingredient-name" style="display:flex; align-items:center; gap: 4px;">
+              <span>${escapeHtml(item.name)}</span>
+              ${getDDayBadge(item.expiryDate)}
+            </div>
+            <div class="ingredient-meta">
+              ${item.expiryDate ? `<span style="color:var(--primary); font-weight:500">기한: ${item.expiryDate}</span> · ` : ''}
+              ${item.memo ? escapeHtml(item.memo) + ' · ' : ''}
+              ${timeAgo(item.addedAt)}
+            </div>
+          </div>
+          <span class="ingredient-badge">${item.category}</span>
+          <button class="ingredient-edit" data-id="${item.id}" style="background:none; border:none; cursor:pointer; padding:6px; font-size:14px; margin-left:4px">✏️</button>
+          <button class="ingredient-delete" data-id="${item.id}">✕</button>
         </div>
-        <span class="ingredient-badge">${item.category}</span>
-        <button class="ingredient-delete" data-id="${item.id}">✕</button>
-      </div>
-    `).join('');
+      `;
+    }).join('');
   }
 
   tabsEl.addEventListener('click', (e) => {
@@ -156,21 +202,74 @@ export function renderIngredients(container: HTMLElement): () => void {
       category: catSelect.value as Category,
       addedAt: Date.now(),
       memo: memoInput.value.trim() || undefined,
+      expiryDate: expiryInput.value || undefined,
     };
 
     await addIngredient(ingredient);
     nameInput.value = '';
     memoInput.value = '';
+    expiryInput.value = '';
     nameInput.focus();
     emit(EVENTS.INGREDIENTS_CHANGED);
   });
 
-  // Delete
+  // Handle Edit and Delete inside List
   listEl.addEventListener('click', async (e) => {
-    const btn = (e.target as HTMLElement).closest('.ingredient-delete') as HTMLElement | null;
-    if (!btn) return;
-    const id = btn.dataset.id!;
-    await deleteIngredient(id);
+    const target = e.target as HTMLElement;
+
+    // Delete
+    const deleteBtn = target.closest('.ingredient-delete') as HTMLElement | null;
+    if (deleteBtn) {
+      const id = deleteBtn.dataset.id!;
+      await deleteIngredient(id);
+      if (editingId === id) editingId = null;
+      emit(EVENTS.INGREDIENTS_CHANGED);
+      return;
+    }
+
+    // Edit trigger
+    const editBtn = target.closest('.ingredient-edit') as HTMLElement | null;
+    if (editBtn) {
+      editingId = editBtn.dataset.id!;
+      renderList();
+      return;
+    }
+
+    // Edit cancel
+    const cancelBtn = target.closest('.edit-cancel') as HTMLElement | null;
+    if (cancelBtn) {
+      editingId = null;
+      renderList();
+      return;
+    }
+  });
+
+  // Handle edit form submit
+  listEl.addEventListener('submit', async (e) => {
+    const editForm = e.target as HTMLFormElement;
+    if (!editForm.classList.contains('edit-item-form')) return;
+    e.preventDefault();
+
+    const id = editForm.dataset.id!;
+    const nameVal = (editForm.querySelector('.edit-name') as HTMLInputElement).value.trim();
+    const memoVal = (editForm.querySelector('.edit-memo') as HTMLInputElement).value.trim() || undefined;
+    const expiryVal = (editForm.querySelector('.edit-expiry') as HTMLInputElement).value || undefined;
+    const catVal = (editForm.querySelector('.edit-cat') as HTMLSelectElement).value as Category;
+
+    const ingredients = await getAllIngredients();
+    const original = ingredients.find(i => i.id === id);
+    if (!original || !nameVal) return;
+
+    const updated: Ingredient = {
+      ...original,
+      name: nameVal,
+      memo: memoVal,
+      expiryDate: expiryVal,
+      category: catVal,
+    };
+
+    await updateIngredient(updated);
+    editingId = null;
     emit(EVENTS.INGREDIENTS_CHANGED);
   });
 
@@ -199,6 +298,16 @@ function parseVoiceInput(text: string): { name: string; category: Category } {
   return { name: text, category: '냉장' };
 }
 
+function getDDayBadge(expiryDate?: string): string {
+  if (!expiryDate) return '';
+  const diff = new Date(expiryDate).getTime() - new Date().setHours(0, 0, 0, 0);
+  const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+  if (days < 0) return `<span class="expiry-badge expired">만료 ${Math.abs(days)}일 지남</span>`;
+  if (days === 0) return `<span class="expiry-badge today">오늘 만료</span>`;
+  if (days <= 3) return `<span class="expiry-badge warning">D-${days}</span>`;
+  return `<span class="expiry-badge normal">D-${days}</span>`;
+}
+
 function escapeHtml(text: string): string {
   const div = document.createElement('div');
   div.textContent = text;
@@ -215,3 +324,4 @@ function timeAgo(ts: number): string {
   const days = Math.floor(hours / 24);
   return `${days}일 전`;
 }
+

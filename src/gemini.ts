@@ -138,6 +138,19 @@ const COMMON_INGREDIENT_KEYWORDS = [
 // 레시피가 제외된 구체적인 이유(필수 재료 부족 등)를 반환하는 함수
 export function getRecipeValidationErrors(recipe: Recipe, availableNames: string[]): string[] {
   const errors: string[] = [];
+  const settings = getSettings();
+  const excluded = settings.excludedIngredients
+    ? settings.excludedIngredients.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
+    : [];
+
+  // 0) 기피 재료 검증 (제목 및 재료명 매칭 시 즉시 에러)
+  for (const ex of excluded) {
+    if (recipe.title.toLowerCase().includes(ex)) {
+      errors.push(`기피 재료 포함(제목): ${ex}`);
+      break;
+    }
+  }
+
   const normalizedAvail = availableNames.map(normalizeIngredientName).filter(Boolean);
   const expandedAvail = normalizedAvail.flatMap(expandWithAliases);
   const candidates = [...expandedAvail, ...BASIC_SEASONINGS];
@@ -147,6 +160,18 @@ export function getRecipeValidationErrors(recipe: Recipe, availableNames: string
   for (const raw of recipe.ingredients) {
     const name = normalizeIngredientName(raw);
     if (!name) continue;
+
+    // 기피 재료가 재료 목록에 포함되었는지 확인
+    let isExcluded = false;
+    for (const ex of excluded) {
+      if (name.toLowerCase().includes(ex) || ex.includes(name.toLowerCase())) {
+        errors.push(`기피 재료 포함: ${raw}`);
+        isExcluded = true;
+        break;
+      }
+    }
+    if (isExcluded) continue;
+
     if (!matchesIngredient(name, candidates)) {
       missingIngredients.push(raw);
     }
@@ -188,7 +213,8 @@ export interface SuggestionResult {
 // 구조화된 레시피 3개 반환 (JSON mode). 최대 2회 재시도로 재료 맞는 것만 필터.
 export async function getRecipeSuggestions(
   ingredients: Ingredient[],
-  preference?: string
+  preference?: string,
+  servingSize: string = '1인분'
 ): Promise<SuggestionResult> {
   const availableNames = ingredients.map((i) => i.name);
   const collected: Recipe[] = [];
@@ -196,7 +222,7 @@ export async function getRecipeSuggestions(
   const seenTitles = new Set<string>();
 
   for (let attempt = 0; attempt < 3 && collected.length < 3; attempt++) {
-    const batch = await fetchRecipes(ingredients, preference, attempt, collected.map((r) => r.title));
+    const batch = await fetchRecipes(ingredients, preference, attempt, collected.map((r) => r.title), servingSize);
     for (const r of batch) {
       if (seenTitles.has(r.title)) continue;
       
@@ -224,9 +250,11 @@ async function fetchRecipes(
   ingredients: Ingredient[],
   preference: string | undefined,
   attempt: number,
-  excludeTitles: string[]
+  excludeTitles: string[],
+  servingSize: string
 ): Promise<Recipe[]> {
-  const { geminiApiKey, geminiModel } = getSettings();
+  const settings = getSettings();
+  const { geminiApiKey, geminiModel, excludedIngredients } = settings;
   if (!geminiApiKey) throw new Error('API 키가 설정되지 않았습니다.');
 
   const ingredientsText = buildIngredientsPrompt(ingredients);
@@ -238,6 +266,33 @@ async function fetchRecipes(
     prompt += `위 요구사항이 추천의 가장 중요한 기준입니다. 3개 중 최소 2개는 이 요구를 직접 충족해야 합니다.\n`;
     prompt += `특정 재료가 언급되어 있고 그 재료가 아래 "사용 가능한 재료"에 있다면, 그 재료가 주재료인 요리를 우선 추천하세요.\n\n`;
   }
+  
+  prompt += `👥【 추천 분량 기준 】\n${servingSize} 기준 (모든 요리의 재료 분량을 이에 맞춰서 작성해주세요.)\n\n`;
+  
+  // 유통기한 임박 재료 우선 소진 힌트
+  const expiringSoon = ingredients.filter(i => {
+    if (!i.expiryDate) return false;
+    const diff = new Date(i.expiryDate).getTime() - new Date().setHours(0, 0, 0, 0);
+    const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+    return days <= 3;
+  });
+  if (expiringSoon.length > 0) {
+    prompt += `⚠️【 유통기한 임박 재료 — 최우선 소진 권장 】\n`;
+    for (const item of expiringSoon) {
+      const diff = new Date(item.expiryDate!).getTime() - new Date().setHours(0, 0, 0, 0);
+      const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+      const ddayStr = days < 0 ? `만료 ${Math.abs(days)}일 지남` : (days === 0 ? '오늘 만료' : `D-${days}`);
+      prompt += `- ${item.name} (${ddayStr})\n`;
+    }
+    prompt += `위 재료들은 곧 상하거나 상온/냉장 보관 기한이 지난 것들이므로, 추천 3가지 중 가능한 요리에 이 재료들을 적극 반영하여 빨리 소진할 수 있도록 도와주세요.\n\n`;
+  }
+
+  // 기피 재료 절대 제외 힌트
+  if (excludedIngredients && excludedIngredients.trim()) {
+    prompt += `🚫【 절대 사용 금지 재료 (사용자 기피 재료) 】\n${excludedIngredients}\n`;
+    prompt += `위 재료들은 사용자가 절대 먹지 못하는 재료들이므로, 요리 이름(title), 필요한 재료(ingredients), 조리 과정(steps) 등 레시피 전체에서 완벽히 제외해 주십시오.\n\n`;
+  }
+
   prompt += `${ingredientsText}\n\n`;
   prompt += `【 사용 가능한 재료 (이것 외에는 기본 양념만 사용 가능) 】\n${availableNames}\n\n`;
 

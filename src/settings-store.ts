@@ -16,8 +16,21 @@ export function getSettings(): AppSettings {
 export function saveSettings(settings: Partial<AppSettings>): void {
   const current = getSettings();
   localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...current, ...settings }));
+  applyTheme();
 }
 
 export function hasApiKey(): boolean {
   return getSettings().geminiApiKey.length > 0;
+}
+
+export function applyTheme(): void {
+  const settings = getSettings();
+  const html = document.documentElement;
+  if (settings.theme === 'light') {
+    html.setAttribute('data-theme', 'light');
+  } else if (settings.theme === 'dark') {
+    html.setAttribute('data-theme', 'dark');
+  } else {
+    html.removeAttribute('data-theme');
+  }
 }

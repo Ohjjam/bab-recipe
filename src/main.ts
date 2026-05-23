@@ -7,6 +7,10 @@ import { renderSettings } from './pages/settings';
 import { renderBookmarks } from './pages/bookmarks';
 import { renderDiary } from './pages/diary';
 import { importFromUrl } from './import';
+import { applyTheme } from './settings-store';
+
+// 테마 적용
+applyTheme();
 
 registerRoute('/ingredients', renderIngredients);
 registerRoute('/recipe', renderRecipe);
