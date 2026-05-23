@@ -32,6 +32,14 @@ export function renderSettings(container: HTMLElement): void {
       <button class="btn btn-danger btn-full" id="clear-chat">채팅 기록 삭제</button>
     </div>
 
+    <div class="settings-group">
+      <div class="settings-label">앱 업데이트</div>
+      <button class="btn btn-outline btn-full" id="force-update">🔄 앱 강제 업데이트</button>
+      <div style="color: var(--text-secondary); font-size: 12px; margin-top: 8px;">
+        앱 캐시만 비우고 새로고침합니다. 재료·기록 등 저장된 데이터는 유지됩니다.
+      </div>
+    </div>
+
     <div class="settings-group text-center" style="color: var(--text-secondary); font-size: 12px;">
       밥 레시피 v1.0.0<br>
       데이터는 이 기기에만 저장됩니다
@@ -44,6 +52,7 @@ export function renderSettings(container: HTMLElement): void {
   const testResult = container.querySelector('#test-result')!;
   const modelSelect = container.querySelector('#model-select') as HTMLSelectElement;
   const clearBtn = container.querySelector('#clear-chat') as HTMLButtonElement;
+  const forceUpdateBtn = container.querySelector('#force-update') as HTMLButtonElement;
 
   // Save API key on change
   apiKeyInput.addEventListener('change', () => {
@@ -92,6 +101,28 @@ export function renderSettings(container: HTMLElement): void {
       await clearChatHistory();
       clearBtn.textContent = '삭제 완료!';
       setTimeout(() => { clearBtn.textContent = '채팅 기록 삭제'; }, 2000);
+    }
+  });
+
+  // Force update — SW + Cache Storage 청소 후 새로고침. IndexedDB는 보존.
+  forceUpdateBtn.addEventListener('click', async () => {
+    if (!confirm('앱을 강제로 업데이트합니다.\n저장된 재료·기록·레시피는 그대로 유지됩니다.\n계속할까요?')) return;
+    forceUpdateBtn.disabled = true;
+    forceUpdateBtn.textContent = '업데이트 중...';
+    try {
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map((r) => r.unregister()));
+      }
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((k) => caches.delete(k)));
+      }
+      location.reload();
+    } catch (err) {
+      forceUpdateBtn.disabled = false;
+      forceUpdateBtn.textContent = '🔄 앱 강제 업데이트';
+      alert('업데이트 실패: ' + (err as Error).message);
     }
   });
 }
