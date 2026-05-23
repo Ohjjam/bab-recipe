@@ -11,7 +11,7 @@ GitHub Actions가 자동으로 빌드/배포한다 ([.github/workflows/deploy.ym
 **변경 작업이 완료되면 별도 컨펌 없이 다음 단계까지 자동 진행한다:**
 
 1. `npx tsc --noEmit`으로 타입 체크
-2. 변경된 파일들을 `git add`
+2. 변경된 파일들을 **명시적으로** `git add <path1> <path2> ...` (`git add -A` / `git add .` 금지 — `.claude/` 같은 로컬 파일이 섞일 수 있음)
 3. 의미 있는 한국어 커밋 메시지로 `git commit`
 4. `git push origin main`
 5. GitHub Actions 빌드 상태를 한 번 확인 (`gh run list --limit 1`)
