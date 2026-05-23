@@ -41,7 +41,7 @@ export function renderSettings(container: HTMLElement): void {
     </div>
 
     <div class="settings-group text-center" style="color: var(--text-secondary); font-size: 12px;">
-      밥 레시피 v1.0.0<br>
+      밥 레시피 v1.0.0 · <code style="font-size:11px">${__BUILD_SHA__}</code> · ${__BUILD_DATE__}<br>
       데이터는 이 기기에만 저장됩니다
     </div>
   `;

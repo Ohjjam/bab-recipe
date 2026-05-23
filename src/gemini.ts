@@ -62,6 +62,39 @@ const BASIC_SEASONINGS = [
   '올리고당', '물엿', '맛술', '미림', '굴소스', '참깨', '통깨', '대파',
 ];
 
+// 재료 별칭 — 사용자 재료(왼쪽)는 모델이 별칭(오른쪽) 중 하나로 표기해도 매칭됨
+// 양방향으로 확장됨: '계란' 가진 사용자에게 '달걀'도 매칭, '달걀' 가진 사용자에게 '계란'도 매칭
+const INGREDIENT_ALIASES: Record<string, string[]> = {
+  '다짐육': ['다진 소고기', '다진소고기', '다진 돼지고기', '다진돼지고기', '다진 고기', '다진고기', '간 고기', '간고기', '다진 닭고기', '다진닭고기', '분쇄육', '소고기 다짐육', '돼지고기 다짐육'],
+  '계란': ['달걀'],
+  '달걀': ['계란'],
+  '대파': ['파'],
+  '쪽파': ['파'],
+  '실파': ['파'],
+  '식용유': ['기름', '카놀라유', '포도씨유', '해바라기유'],
+  '올리브유': ['올리브오일'],
+  '버터': ['무염버터', '가염버터'],
+  '치즈': ['모짜렐라', '체다치즈', '슬라이스치즈', '피자치즈'],
+  '우유': ['멸균우유', '저지방우유'],
+  '돼지고기': ['삼겹살', '목살', '앞다리살', '뒷다리살', '돼지 안심', '돼지 등심'],
+  '소고기': ['한우', '우삼겹', '차돌박이', '소 안심', '소 등심', '불고기감'],
+  '닭고기': ['닭가슴살', '닭다리', '닭 안심', '닭 정육'],
+  '두부': ['연두부', '순두부', '부침두부', '찌개두부', '판두부'],
+  '햇반': ['즉석밥', '밥', '쌀밥', '공깃밥'],
+  '밥': ['햇반', '즉석밥', '쌀밥', '공깃밥'],
+  '파스타면': ['스파게티면', '스파게티', '파스타', '링귀니', '페투치니'],
+  '김치': ['묵은지', '배추김치', '신김치'],
+};
+
+function expandWithAliases(name: string): string[] {
+  const result = new Set<string>([name]);
+  const aliases = INGREDIENT_ALIASES[name];
+  if (aliases) {
+    for (const a of aliases) result.add(a);
+  }
+  return [...result];
+}
+
 function normalizeIngredientName(raw: string): string {
   // "삼겹살 300g" → "삼겹살", "양파 1/2개" → "양파"
   return raw
@@ -102,21 +135,23 @@ const COMMON_INGREDIENT_KEYWORDS = [
 // 레시피가 유효한지 검증 (재료 + 제목 둘 다)
 function isRecipeValid(recipe: Recipe, availableNames: string[]): boolean {
   const normalizedAvail = availableNames.map(normalizeIngredientName).filter(Boolean);
-  const candidates = [...normalizedAvail, ...BASIC_SEASONINGS];
+  // 사용자 재료 + 별칭 + 양념 모두를 매칭 후보로
+  const expandedAvail = normalizedAvail.flatMap(expandWithAliases);
+  const candidates = [...expandedAvail, ...BASIC_SEASONINGS];
 
-  // 1) ingredients 배열 검증 — 모델이 적은 모든 재료가 사용자/양념에 매칭되어야 함
+  // 1) ingredients 배열 검증 — 모델이 적은 모든 재료가 사용자/별칭/양념에 매칭되어야 함
   for (const raw of recipe.ingredients) {
     const name = normalizeIngredientName(raw);
     if (!name) continue;
     if (!matchesIngredient(name, candidates)) return false;
   }
 
-  // 2) 제목 검증 — 주재료 키워드가 제목에 있는데 사용자 재료에 없으면 탈락
+  // 2) 제목 검증 — 주재료 키워드가 제목에 있는데 사용자 재료(+별칭)에 없으면 탈락
   //    (1글자 키워드는 오탐 방지를 위해 스킵)
   for (const keyword of COMMON_INGREDIENT_KEYWORDS) {
     if (keyword.length < 2) continue;
     if (!recipe.title.includes(keyword)) continue;
-    const userHas = normalizedAvail.some((n) => n === keyword || n.includes(keyword));
+    const userHas = expandedAvail.some((n) => n === keyword || n.includes(keyword) || keyword.includes(n));
     if (!userHas) return false;
   }
 
@@ -167,6 +202,18 @@ async function fetchRecipes(
   }
   prompt += `${ingredientsText}\n\n`;
   prompt += `【 사용 가능한 재료 (이것 외에는 기본 양념만 사용 가능) 】\n${availableNames}\n\n`;
+
+  // 사용자 재료의 별칭이 있으면 모델에게 알려줘서 표기를 통일하도록 유도
+  const aliasHints: string[] = [];
+  for (const name of ingredients.map((i) => normalizeIngredientName(i.name))) {
+    if (INGREDIENT_ALIASES[name]) {
+      aliasHints.push(`- "${name}" = ${INGREDIENT_ALIASES[name].slice(0, 4).join(', ')} 등으로 표기 가능 (어느 표기든 같은 재료)`);
+    }
+  }
+  if (aliasHints.length > 0) {
+    prompt += `【 재료 표기 별칭 — 같은 재료로 취급 】\n${aliasHints.join('\n')}\n\n`;
+  }
+
   prompt += `【 기본 양념 (위 목록에 없어도 자유롭게 사용 가능) 】\n소금, 설탕, 간장, 고추장, 된장, 식초, 식용유, 참기름, 들기름, 후추, 다진마늘, 물, 고춧가루\n\n`;
   prompt += `위 재료만으로 만들 수 있는 실제 한국/가정 요리 3가지를 추천하세요.\n\n`;
   prompt += `반드시 답변 전에 내부적으로 다음 체크리스트를 확인하세요:\n`;

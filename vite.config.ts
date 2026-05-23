@@ -1,8 +1,24 @@
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import { execSync } from 'node:child_process';
+
+function getBuildSha(): string {
+  try {
+    return execSync('git rev-parse --short HEAD').toString().trim();
+  } catch {
+    return 'dev';
+  }
+}
+
+const buildSha = getBuildSha();
+const buildDate = new Date().toISOString().slice(0, 10);
 
 export default defineConfig({
   base: '/bab-recipe/',
+  define: {
+    __BUILD_SHA__: JSON.stringify(buildSha),
+    __BUILD_DATE__: JSON.stringify(buildDate),
+  },
   plugins: [
     VitePWA({
       registerType: 'autoUpdate',
