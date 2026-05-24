@@ -72,3 +72,16 @@ export const DEFAULT_SETTINGS: AppSettings = {
   targetFat: 60,
   theme: 'system',
 };
+
+export interface ShoppingRecommendation {
+  ingredient: string;     // 추천 식재료 이름 (예: 돼지고기)
+  category: string;       // 카테고리 (예: 정육/계란, 채소)
+  expectedCost: string;   // 예상 비용 범위 (예: "8,000원 ~ 12,000원")
+  reason: string;         // 이 식재료를 추천하는 이유 (보유 재료와의 결합 설명)
+  recipes: Recipe[];      // 이 식재료를 구매했을 때 만들 수 있는 요리 목록
+}
+
+export interface ShoppingSuggestionResult {
+  recommendations: ShoppingRecommendation[];
+}
+

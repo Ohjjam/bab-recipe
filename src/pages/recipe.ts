@@ -35,15 +35,23 @@ export function renderRecipe(container: HTMLElement): void {
         <option value="5인분 이상">5인분 이상 기준</option>
       </select>
     </div>
-    <button class="btn btn-primary btn-full mb-16" id="suggest-btn">🍳 레시피 추천받기</button>
+    <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 8px;" class="mb-16">
+      <button class="btn btn-primary" id="suggest-btn">🍳 레시피 추천</button>
+      <button class="btn btn-outline" id="recipe-go-shopping-btn">🛒 장보기 추천</button>
+    </div>
     <div id="recipe-result"></div>
   `;
 
   const prefInput = container.querySelector('#pref-input') as HTMLTextAreaElement;
   const chipsEl = container.querySelector('#pref-chips')!;
   const suggestBtn = container.querySelector('#suggest-btn') as HTMLButtonElement;
+  const recipeGoShoppingBtn = container.querySelector('#recipe-go-shopping-btn') as HTMLButtonElement;
   const resultEl = container.querySelector('#recipe-result') as HTMLElement;
   const servingSelect = container.querySelector('#serving-select') as HTMLSelectElement;
+
+  recipeGoShoppingBtn.addEventListener('click', () => {
+    navigate('/shopping');
+  });
 
   // Chip click — append to preference input
   chipsEl.addEventListener('click', (e) => {
@@ -92,10 +100,13 @@ export function renderRecipe(container: HTMLElement): void {
             현재 재료로 만들 수 있는 레시피를 찾지 못했어요.<br>
             재료를 더 추가하거나 요구사항을 완화해주세요.
           </div>
+          <div style="margin-top: 16px;">
+            <button class="btn btn-outline btn-full" id="recipe-err-shopping-btn">🛒 냉장고 재료 맞춤 장보기 추천받기</button>
+          </div>
         `;
         if (invalidRecipesList.length > 0) {
           errorHtml += `
-            <div class="invalid-recipes-feedback">
+            <div class="invalid-recipes-feedback" style="margin-top: 16px;">
               <div class="feedback-title">💡 이런 레시피를 구상했으나 재료가 부족합니다:</div>
               <ul class="feedback-list">
                 ${invalidRecipesList.map(ir => `
@@ -109,6 +120,8 @@ export function renderRecipe(container: HTMLElement): void {
           `;
         }
         resultEl.innerHTML = errorHtml;
+        const errShoppingBtn = resultEl.querySelector('#recipe-err-shopping-btn');
+        errShoppingBtn?.addEventListener('click', () => navigate('/shopping'));
       } else {
         renderRecipes();
       }

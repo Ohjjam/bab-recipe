@@ -1446,4 +1446,278 @@ body {
   border-radius: 3px;
 }
 
+/* Shopping Suggestions Page */
+.shopping-banner {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+  color: var(--text-on-primary);
+  padding: 14px 16px;
+  border-radius: var(--radius);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.2);
+  position: relative;
+  overflow: hidden;
+}
+
+.shopping-banner::before {
+  content: '';
+  position: absolute;
+  top: -20px;
+  right: -20px;
+  width: 80px;
+  height: 80px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.banner-icon {
+  font-size: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.banner-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.banner-title {
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 2px;
+  color: #ffffff;
+}
+
+.banner-subtitle {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.banner-btn {
+  background: #ffffff;
+  color: var(--primary-dark);
+  border: none;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.banner-btn:active {
+  transform: scale(0.95);
+  opacity: 0.9;
+}
+
+.shopping-page-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.shopping-page-title {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.shopping-page-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.shopping-card {
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 16px;
+  border: 1px solid var(--border);
+  transition: transform 0.2s;
+}
+
+.shopping-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.shopping-card-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.shopping-card-name {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.shopping-card-badge {
+  font-size: 10px;
+  padding: 2px 6px;
+  background: var(--primary-light);
+  color: var(--primary-dark);
+  border-radius: 6px;
+  font-weight: 600;
+}
+
+.cost-badge {
+  font-size: 11px;
+  padding: 4px 8px;
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  border-radius: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.shopping-card-reason {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.shopping-recipes-section {
+  border-top: 1px dashed var(--border);
+  padding-top: 12px;
+  margin-top: 12px;
+}
+
+.shopping-recipes-title {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--text);
+}
+
+.shopping-recipes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.shopping-recipe-item {
+  background: var(--bg-input);
+  border-radius: 8px;
+  padding: 12px;
+  border: 1px solid transparent;
+  transition: all 0.2s;
+}
+
+.shopping-recipe-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.shopping-recipe-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.shopping-recipe-meta {
+  display: flex;
+  gap: 4px;
+}
+
+.shopping-recipe-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+/* Ingredients tagging inside recipe detail */
+.recipe-list li.ing-owned {
+  color: var(--text);
+  font-weight: 500;
+}
+.recipe-list li.ing-owned::after {
+  content: ' (보유중)';
+  font-size: 10px;
+  color: var(--primary-dark);
+  font-weight: bold;
+  margin-left: 4px;
+}
+
+.recipe-list li.ing-recommended {
+  color: #E65100;
+  font-weight: 600;
+}
+.recipe-list li.ing-recommended::after {
+  content: ' (구매필요)';
+  font-size: 10px;
+  color: #E65100;
+  font-weight: bold;
+  margin-left: 4px;
+}
+
+.recipe-list li.ing-seasoning {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+/* Shopping Loader */
+.shopping-loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.loader-cart {
+  font-size: 48px;
+  animation: cart-bounce 1.5s infinite ease-in-out;
+  margin-bottom: 12px;
+}
+
+.loader-items {
+  display: flex;
+  gap: 8px;
+  font-size: 20px;
+  height: 24px;
+  margin-bottom: 16px;
+}
+
+.loader-items span {
+  animation: item-fall 1.5s infinite ease-in-out;
+  opacity: 0;
+}
+
+.loader-items span:nth-child(1) {
+  animation-delay: 0.1s;
+}
+
+.loader-items span:nth-child(2) {
+  animation-delay: 0.4s;
+}
+
+.loader-items span:nth-child(3) {
+  animation-delay: 0.7s;
+}
+
+@keyframes cart-bounce {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-10px) rotate(-5deg); }
+}
+
+@keyframes item-fall {
+  0% { transform: translateY(-30px); opacity: 0; }
+  30% { transform: translateY(0); opacity: 1; }
+  70% { transform: translateY(0) scale(1); opacity: 1; }
+  100% { transform: translateY(10px) scale(0); opacity: 0; }
+}
+
 

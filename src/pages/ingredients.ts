@@ -1,12 +1,21 @@
 import { getAllIngredients, getIngredientsByCategory, addIngredient, deleteIngredient, updateIngredient } from '../db';
 import { subscribe, emit, EVENTS } from '../state';
 import { CATEGORIES, type Category, type Ingredient } from '../types';
+import { navigate } from '../router';
 
 export function renderIngredients(container: HTMLElement): () => void {
   let activeCategory: Category | '전체' = '전체';
   let editingId: string | null = null;
 
   container.innerHTML = `
+    <div class="shopping-banner mb-16" id="shopping-banner">
+      <div class="banner-icon">🛒</div>
+      <div class="banner-content">
+        <div class="banner-title">장보기 추천받기</div>
+        <div class="banner-subtitle">냉장고 재료 맞춤 가성비 식재료 추천</div>
+      </div>
+      <button type="button" class="banner-btn" id="go-shopping-btn">추천받기 →</button>
+    </div>
     <div class="category-tabs" id="cat-tabs"></div>
     <form class="add-form" id="add-form">
       <input type="text" id="add-name" placeholder="재료 이름" autocomplete="off" required />
@@ -31,6 +40,11 @@ export function renderIngredients(container: HTMLElement): () => void {
   const catSelect = container.querySelector('#add-cat') as HTMLSelectElement;
   const voiceBtn = container.querySelector('#voice-btn') as HTMLButtonElement;
   const voiceStatus = container.querySelector('#voice-status') as HTMLElement;
+  const goShoppingBtn = container.querySelector('#go-shopping-btn') as HTMLButtonElement;
+
+  goShoppingBtn.addEventListener('click', () => {
+    navigate('/shopping');
+  });
 
   // --- Voice Input ---
   let recognition: SpeechRecognition | null = null;

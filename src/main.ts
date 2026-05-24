@@ -6,6 +6,7 @@ import { renderChat } from './pages/chat';
 import { renderSettings } from './pages/settings';
 import { renderBookmarks } from './pages/bookmarks';
 import { renderDiary } from './pages/diary';
+import { renderShopping } from './pages/shopping';
 import { importFromUrl } from './import';
 import { applyTheme } from './settings-store';
 
@@ -18,6 +19,7 @@ registerRoute('/chat', renderChat);
 registerRoute('/settings', renderSettings);
 registerRoute('/bookmarks', renderBookmarks);
 registerRoute('/diary', renderDiary);
+registerRoute('/shopping', renderShopping);
 
 const content = document.getElementById('content')!;
 

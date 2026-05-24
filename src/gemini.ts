@@ -1,5 +1,5 @@
 import { getSettings } from './settings-store';
-import type { Ingredient, ChatMessage, Recipe, Nutrition } from './types';
+import type { Ingredient, ChatMessage, Recipe, Nutrition, ShoppingSuggestionResult } from './types';
 
 const BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 
@@ -517,3 +517,91 @@ async function* streamGemini(
     }
   }
 }
+
+export async function getShoppingSuggestions(
+  ingredients: Ingredient[]
+): Promise<ShoppingSuggestionResult> {
+  const settings = getSettings();
+  const { geminiApiKey, geminiModel, excludedIngredients } = settings;
+  if (!geminiApiKey) throw new Error('API 키가 설정되지 않았습니다.');
+
+  const availableNames = ingredients.map((i) => i.name).join(', ');
+  
+  const prompt = `당신은 한국 가정 요리 및 식재료 전문가입니다. 
+사용자가 현재 냉장고에 보유하고 있는 재료 목록을 기반으로, 마트에서 추가로 장을 보면 좋을 만한 식재료(추천 재료) 3~4가지를 제안해 주세요.
+각 추천 재료별로 사용자가 냉장고에 보유 중인 재료와 결합하여 해먹을 수 있는 맛있는 한국 가정식 또는 인기 요리 레시피를 1~2개씩 함께 추천해야 합니다.
+
+【 입력 정보 】
+- 사용자가 현재 보유 중인 재료 목록: [ ${availableNames || '없음(냉장고가 비어 있음)'} ]
+
+【 규칙 】
+1. 추천하는 식재료(추천 재료)는 반드시 사용자가 현재 보유한 재료 목록에 없는 것이어야 합니다.
+2. 기피 재료(${excludedIngredients || '없음'})는 절대로 추천 재료로 제안하거나 레시피에 포함해서는 안 됩니다.
+3. 각 추천 재료별 예상 비용 범위(expectedCost)는 한국 대형마트 기준으로 합리적으로 추정하여 예: "3,000원 내외", "5,000원 ~ 8,000원"과 같이 작성해 주세요.
+4. 각 추천 재료별 추천 사유(reason)에는 보유 중인 어떤 재료와 조합하여 어떤 시너지를 내는지 친절하게 설명해 주세요.
+5. 레시피(recipes)의 ingredients 필드에는 해당 요리에 실제로 사용하는 재료 전체를 구체적 분량과 함께 나열하되, 각 재료 이름 뒤에 "(보유)", "(추천)", "(기본 양념)"을 표시해 주세요.
+   예: "돼지고기 300g (추천)", "김치 1/4포기 (보유)", "두부 1/2모 (보유)", "대파 1대 (기본 양념)"
+6. 기본 양념(소금, 설탕, 간장, 고추장, 된장, 식초, 식용유, 참기름, 후추, 다진마늘, 물, 고춧가루, 대파 등)은 보유 목록에 없더라도 자유롭게 레시피에 사용하고 "(기본 양념)"으로 표시할 수 있습니다.
+7. 요리 이름은 반드시 실제로 존재하는 정식 요리명만 사용하세요 (예: "제육볶음", "된장찌개", "김치찌개" 등. 재료를 나열한 조잡한 이름 금지).
+8. 모든 텍스트는 한국어로 작성해 주세요.
+`;
+
+  const url = `${BASE_URL}/${geminiModel}:generateContent?key=${geminiApiKey}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig: {
+        temperature: 0.5,
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: 'object',
+          properties: {
+            recommendations: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  ingredient: { type: 'string' },
+                  category: { type: 'string' },
+                  expectedCost: { type: 'string' },
+                  reason: { type: 'string' },
+                  recipes: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      properties: {
+                        title: { type: 'string' },
+                        difficulty: { type: 'string' },
+                        time: { type: 'string' },
+                        description: { type: 'string' },
+                        ingredients: { type: 'array', items: { type: 'string' } },
+                        steps: { type: 'array', items: { type: 'string' } },
+                      },
+                      required: ['title', 'difficulty', 'time', 'description', 'ingredients', 'steps'],
+                    },
+                  },
+                },
+                required: ['ingredient', 'category', 'expectedCost', 'reason', 'recipes'],
+              },
+            },
+          },
+          required: ['recommendations'],
+        },
+      },
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Gemini API 오류 (${res.status}): ${err}`);
+  }
+
+  const data = await res.json();
+  const jsonText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!jsonText) throw new Error('응답이 비어있습니다');
+
+  return JSON.parse(jsonText) as ShoppingSuggestionResult;
+}
+
