@@ -5,21 +5,24 @@ import { navigate } from '../router';
 import { emit, EVENTS } from '../state';
 import type { Category, Ingredient, Recipe, Bookmark, MealEntry, ShoppingRecommendation } from '../types';
 
+let recommendations: ShoppingRecommendation[] = [];
+let expandedRecipeIdx: { cardIdx: number; recipeIdx: number } | null = null;
+
 export function renderShopping(container: HTMLElement): () => void {
-  let recommendations: ShoppingRecommendation[] = [];
-  let expandedRecipeIdx: { cardIdx: number; recipeIdx: number } | null = null;
   let isLoading = false;
 
   container.innerHTML = `
     <div class="shopping-page-header mb-16">
       <button class="btn btn-outline btn-sm" id="shopping-back-btn">← 뒤로 가기</button>
-      <h2 class="shopping-page-title">🛒 스마트 장보기 추천</h2>
+      <h2 class="shopping-page-title" style="flex:1">🛒 스마트 장보기 추천</h2>
+      <button class="btn btn-outline btn-sm" id="shopping-refresh-btn">🔄 다시 추천</button>
     </div>
     <p class="shopping-page-desc mb-16">냉장고의 남은 재료를 100% 활용할 수 있도록 가성비 좋은 추가 식재료와 레시피를 제안합니다.</p>
     <div id="shopping-result"></div>
   `;
 
   const backBtn = container.querySelector('#shopping-back-btn') as HTMLButtonElement;
+  const refreshBtn = container.querySelector('#shopping-refresh-btn') as HTMLButtonElement;
   const resultEl = container.querySelector('#shopping-result') as HTMLElement;
 
   backBtn.addEventListener('click', () => {
@@ -28,6 +31,12 @@ export function renderShopping(container: HTMLElement): () => void {
       window.history.back();
     } else {
       navigate('/ingredients');
+    }
+  });
+
+  refreshBtn.addEventListener('click', () => {
+    if (!isLoading) {
+      generate();
     }
   });
 
@@ -42,6 +51,7 @@ export function renderShopping(container: HTMLElement): () => void {
     }
 
     isLoading = true;
+    refreshBtn.disabled = true;
     resultEl.innerHTML = `
       <div class="shopping-loader">
         <div class="loader-cart">🛒</div>
@@ -73,6 +83,7 @@ export function renderShopping(container: HTMLElement): () => void {
       resultEl.innerHTML = `<div class="status status-error">오류: ${(err as Error).message}</div>`;
     } finally {
       isLoading = false;
+      refreshBtn.disabled = false;
     }
   }
 
@@ -254,7 +265,11 @@ export function renderShopping(container: HTMLElement): () => void {
     });
   }
 
-  generate();
+  if (recommendations.length > 0) {
+    renderRecommendations();
+  } else {
+    generate();
+  }
 
   return () => {
     // cleanup if needed

@@ -13,15 +13,17 @@ const PREFERENCE_CHIPS = [
   '한 그릇 음식',
 ];
 
-export function renderRecipe(container: HTMLElement): void {
-  let recipes: Recipe[] = [];
-  let expandedIdx: number | null = null;
-  let invalidRecipesList: { recipe: Recipe; reasons: string[] }[] = [];
+let recipes: Recipe[] = [];
+let expandedIdx: number | null = null;
+let invalidRecipesList: { recipe: Recipe; reasons: string[] }[] = [];
+let savedPreference = '';
+let savedServing = '1인분';
 
+export function renderRecipe(container: HTMLElement): void {
   container.innerHTML = `
     <div class="preference-section">
       <label class="preference-label">어떤 요리 원해? <span style="color:var(--text-secondary);font-weight:400">(선택)</span></label>
-      <textarea id="pref-input" class="preference-input" rows="2" placeholder="예: 간단하게 30분 안에 매콤한 거 먹고 싶어"></textarea>
+      <textarea id="pref-input" class="preference-input" rows="2" placeholder="예: 간단하게 30분 안에 매콤한 거 먹고 싶어">${escapeHtml(savedPreference)}</textarea>
       <div class="preference-chips" id="pref-chips">
         ${PREFERENCE_CHIPS.map((c) => `<button type="button" class="chip" data-chip="${c}">${c}</button>`).join('')}
       </div>
@@ -29,14 +31,14 @@ export function renderRecipe(container: HTMLElement): void {
     <div class="settings-group mb-16">
       <label class="preference-label">식사 분량</label>
       <select class="settings-select" id="serving-select">
-        <option value="1인분" selected>1인분 기준</option>
-        <option value="2인분">2인분 기준</option>
-        <option value="3~4인분">3~4인분 기준</option>
-        <option value="5인분 이상">5인분 이상 기준</option>
+        <option value="1인분" ${savedServing === '1인분' ? 'selected' : ''}>1인분 기준</option>
+        <option value="2인분" ${savedServing === '2인분' ? 'selected' : ''}>2인분 기준</option>
+        <option value="3~4인분" ${savedServing === '3~4인분' ? 'selected' : ''}>3~4인분 기준</option>
+        <option value="5인분 이상" ${savedServing === '5인분 이상' ? 'selected' : ''}>5인분 이상 기준</option>
       </select>
     </div>
     <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 8px;" class="mb-16">
-      <button class="btn btn-primary" id="suggest-btn">🍳 레시피 추천</button>
+      <button class="btn btn-primary" id="suggest-btn">${recipes.length > 0 ? '🔄 다시 추천받기' : '🍳 레시피 추천'}</button>
       <button class="btn btn-outline" id="recipe-go-shopping-btn">🛒 장보기 추천</button>
     </div>
     <div id="recipe-result"></div>
@@ -51,6 +53,14 @@ export function renderRecipe(container: HTMLElement): void {
 
   recipeGoShoppingBtn.addEventListener('click', () => {
     navigate('/shopping');
+  });
+
+  // Save inputs on change
+  prefInput.addEventListener('input', () => {
+    savedPreference = prefInput.value;
+  });
+  servingSelect.addEventListener('change', () => {
+    savedServing = servingSelect.value;
   });
 
   // Chip click — append to preference input
@@ -293,6 +303,37 @@ export function renderRecipe(container: HTMLElement): void {
       generate();
     }
   });
+
+  // Restore state if available
+  if (recipes.length > 0) {
+    renderRecipes();
+  } else if (invalidRecipesList.length > 0) {
+    let errorHtml = `
+      <div class="status status-error">
+        현재 재료로 만들 수 있는 레시피를 찾지 못했어요.<br>
+        재료를 더 추가하거나 요구사항을 완화해주세요.
+      </div>
+      <div style="margin-top: 16px;">
+        <button class="btn btn-outline btn-full" id="recipe-err-shopping-btn">🛒 냉장고 재료 맞춤 장보기 추천받기</button>
+      </div>
+    `;
+    errorHtml += `
+      <div class="invalid-recipes-feedback" style="margin-top: 16px;">
+        <div class="feedback-title">💡 이런 레시피를 구상했으나 재료가 부족합니다:</div>
+        <ul class="feedback-list">
+          ${invalidRecipesList.map(ir => `
+            <li>
+              <strong class="feedback-recipe-title">${escapeHtml(ir.recipe.title)}</strong>
+              <div class="feedback-reason">${escapeHtml(ir.reasons.join(' · '))}</div>
+            </li>
+          `).join('')}
+        </ul>
+      </div>
+    `;
+    resultEl.innerHTML = errorHtml;
+    const errShoppingBtn = resultEl.querySelector('#recipe-err-shopping-btn');
+    errShoppingBtn?.addEventListener('click', () => navigate('/shopping'));
+  }
 }
 
 function formatRecipe(r: Recipe): string {
