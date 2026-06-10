@@ -2,6 +2,7 @@ import { getSettings, saveSettings } from '../settings-store';
 import { testConnection } from '../gemini';
 import { clearChatHistory, exportAllData, importAllData } from '../db';
 import { emit, EVENTS } from '../state';
+import { escapeHtml } from '../html-utils';
 
 export function renderSettings(container: HTMLElement): void {
   const settings = getSettings();
@@ -10,7 +11,7 @@ export function renderSettings(container: HTMLElement): void {
     <div class="settings-group">
       <div class="settings-label">Gemini API 키</div>
       <input type="password" class="settings-input" id="api-key"
-        value="${escapeAttr(settings.geminiApiKey)}"
+        value="${escapeHtml(settings.geminiApiKey)}"
         placeholder="Google AI Studio에서 발급받은 API 키" />
       <div class="settings-row">
         <button class="btn btn-outline" id="toggle-key" style="flex:1">키 보기</button>
@@ -40,7 +41,7 @@ export function renderSettings(container: HTMLElement): void {
     <div class="settings-group">
       <div class="settings-label">기피/제외 재료 설정</div>
       <input type="text" class="settings-input" id="excluded-ingredients"
-        value="${escapeAttr(settings.excludedIngredients || '')}"
+        value="${escapeHtml(settings.excludedIngredients || '')}"
         placeholder="예: 오이, 고수, 당근 (쉼표로 구분)" />
     </div>
 
@@ -150,7 +151,7 @@ export function renderSettings(container: HTMLElement): void {
         ? '<div class="status status-success">✅ 연결 성공!</div>'
         : '<div class="status status-error">❌ 연결 실패. API 키를 확인해주세요.</div>';
     } catch (err) {
-      testResult.innerHTML = `<div class="status status-error">❌ 오류: ${(err as Error).message}</div>`;
+      testResult.innerHTML = `<div class="status status-error">❌ 오류: ${escapeHtml((err as Error).message)}</div>`;
     } finally {
       testBtn.disabled = false;
       testBtn.textContent = '연결 테스트';
@@ -290,6 +291,3 @@ export function renderSettings(container: HTMLElement): void {
   });
 }
 
-function escapeAttr(str: string): string {
-  return str.replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}

@@ -2,6 +2,8 @@ import { getAllIngredients, getIngredientsByCategory, addIngredient, deleteIngre
 import { subscribe, emit, EVENTS } from '../state';
 import { CATEGORIES, type Category, type Ingredient } from '../types';
 import { navigate } from '../router';
+import { daysUntilLocal } from '../date-utils';
+import { escapeHtml } from '../html-utils';
 
 export function renderIngredients(container: HTMLElement): () => void {
   let activeCategory: Category | '전체' = '전체';
@@ -18,14 +20,18 @@ export function renderIngredients(container: HTMLElement): () => void {
     </div>
     <div class="category-tabs" id="cat-tabs"></div>
     <form class="add-form" id="add-form">
-      <input type="text" id="add-name" placeholder="재료 이름" autocomplete="off" required />
-      <input type="text" id="add-memo" placeholder="메모" style="width:70px" />
-      <input type="date" id="add-expiry" title="유통기한" style="width:115px; font-size:12px; padding: 4px 6px" />
-      <select id="add-cat">
-        ${CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('')}
-      </select>
-      <button type="submit" class="btn btn-primary">+</button>
-      <button type="button" class="btn-voice" id="voice-btn" title="음성 입력">🎤</button>
+      <div class="add-form-row">
+        <input type="text" id="add-name" placeholder="재료 이름" autocomplete="off" required />
+        <button type="submit" class="btn btn-primary">+</button>
+        <button type="button" class="btn-voice" id="voice-btn" title="음성 입력">🎤</button>
+      </div>
+      <div class="add-form-row">
+        <input type="text" id="add-memo" placeholder="메모" />
+        <input type="date" id="add-expiry" title="유통기한" style="font-size:12px" />
+        <select id="add-cat">
+          ${CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('')}
+        </select>
+      </div>
     </form>
     <div id="voice-status" class="voice-status" style="display:none"></div>
     <div class="ingredient-list" id="ingredient-list"></div>
@@ -314,18 +320,11 @@ function parseVoiceInput(text: string): { name: string; category: Category } {
 
 function getDDayBadge(expiryDate?: string): string {
   if (!expiryDate) return '';
-  const diff = new Date(expiryDate).getTime() - new Date().setHours(0, 0, 0, 0);
-  const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+  const days = daysUntilLocal(expiryDate);
   if (days < 0) return `<span class="expiry-badge expired">만료 ${Math.abs(days)}일 지남</span>`;
   if (days === 0) return `<span class="expiry-badge today">오늘 만료</span>`;
   if (days <= 3) return `<span class="expiry-badge warning">D-${days}</span>`;
   return `<span class="expiry-badge normal">D-${days}</span>`;
-}
-
-function escapeHtml(text: string): string {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
 }
 
 function timeAgo(ts: number): string {

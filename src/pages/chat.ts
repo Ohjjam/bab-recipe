@@ -1,7 +1,8 @@
 import { getAllIngredients } from '../db';
-import { getChatHistory, addChatMessage, clearChatHistory } from '../db';
+import { getChatHistory, addChatMessage } from '../db';
 import { streamChat } from '../gemini';
 import { hasApiKey } from '../settings-store';
+import { escapeHtml } from '../html-utils';
 import type { ChatMessage } from '../types';
 
 export function renderChat(container: HTMLElement): () => void {
@@ -21,6 +22,7 @@ export function renderChat(container: HTMLElement): () => void {
 
   let isStreaming = false;
   let chatMessages: ChatMessage[] = [];
+  let abortController: AbortController | null = null;
 
   function renderMessages() {
     if (chatMessages.length === 0) {
@@ -33,7 +35,7 @@ export function renderChat(container: HTMLElement): () => void {
       return;
     }
     messagesEl.innerHTML = chatMessages.map(m =>
-      `<div class="chat-bubble ${m.role}">${escapeHtml(m.text)}</div>`
+      `<div class="chat-bubble ${m.role}">${m.role === 'model' ? renderMarkdownLite(m.text) : escapeHtml(m.text)}</div>`
     ).join('');
     messagesEl.scrollTop = messagesEl.scrollHeight;
   }
@@ -82,20 +84,27 @@ export function renderChat(container: HTMLElement): () => void {
 
     isStreaming = true;
     sendBtn.disabled = true;
+    abortController = new AbortController();
 
     try {
       const ingredients = await getAllIngredients();
-      for await (const chunk of streamChat(chatMessages.slice(0, -1), ingredients)) {
+      for await (const chunk of streamChat(chatMessages.slice(0, -1), ingredients, abortController.signal)) {
         modelMsg.text += chunk;
         renderMessages();
       }
       await addChatMessage(modelMsg);
     } catch (err) {
-      modelMsg.text = `오류: ${(err as Error).message}`;
-      renderMessages();
+      if ((err as Error).name === 'AbortError') {
+        // 페이지 이탈로 중단 — 받은 부분까지 저장해서 답변이 사라지지 않게
+        if (modelMsg.text) await addChatMessage(modelMsg);
+      } else {
+        modelMsg.text = `오류: ${(err as Error).message}`;
+        renderMessages();
+      }
     } finally {
       isStreaming = false;
       sendBtn.disabled = false;
+      abortController = null;
     }
   }
 
@@ -117,11 +126,23 @@ export function renderChat(container: HTMLElement): () => void {
 
   loadHistory();
 
-  return () => {};
+  // 라우트 이탈 시 진행 중인 스트리밍 중단 (분리된 DOM에 계속 렌더링하는 것 방지)
+  return () => {
+    abortController?.abort();
+  };
 }
 
-function escapeHtml(text: string): string {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
+// AI 응답의 마크다운을 가볍게 렌더링.
+// 그대로 두면 **굵게**, ## 제목, * 목록 기호가 날것으로 보여 "글자가 깨진" 것처럼 보인다.
+// 반드시 escape를 먼저 한 뒤 제한된 패턴만 태그로 변환하므로 XSS 위험 없음.
+function renderMarkdownLite(text: string): string {
+  return escapeHtml(text)
+    // 제목 (#, ##, ### ...) → 굵게
+    .replace(/^#{1,4}\s+(.+)$/gm, '<strong>$1</strong>')
+    // **굵게**
+    .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
+    // `인라인 코드`
+    .replace(/`([^`\n]+)`/g, '<code>$1</code>')
+    // 목록 기호 (* item / - item) → 불릿
+    .replace(/^[ \t]*[*-]\s+/gm, '• ');
 }

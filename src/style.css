@@ -2,6 +2,7 @@
   --primary: #4CAF50;
   --primary-light: #e8f5e9;
   --primary-dark: #388E3C;
+  --primary-soft-text: #2E7D32; /* primary-light 배경 위에서 읽히는 텍스트 색 */
   --bg: #FAFAF5;
   --bg-card: #FFFFFF;
   --bg-input: #F5F5F0;
@@ -11,6 +12,10 @@
   --border: #E0E0E0;
   --danger: #EF5350;
   --danger-bg: #FFEBEE;
+  --error-text: #C62828;
+  --success-bg: #E8F5E9;
+  --success-text: #2E7D32;
+  --accent-orange: #E65100;
   --shadow: 0 1px 3px rgba(0,0,0,0.1);
   --radius: 12px;
   --nav-height: 64px;
@@ -26,8 +31,13 @@
     --text-secondary: #9E9E9E;
     --border: #404040;
     --danger-bg: #3E2723;
+    --error-text: #EF9A9A;
+    --success-bg: #1B3A1B;
+    --success-text: #81C784;
+    --accent-orange: #FFB74D;
     --shadow: 0 1px 3px rgba(0,0,0,0.3);
     --primary-light: #2C3E2C;
+    --primary-soft-text: #81C784;
   }
 }
 
@@ -39,8 +49,13 @@
   --text-secondary: #9E9E9E;
   --border: #404040;
   --danger-bg: #3E2723;
+  --error-text: #EF9A9A;
+  --success-bg: #1B3A1B;
+  --success-text: #81C784;
+  --accent-orange: #FFB74D;
   --shadow: 0 1px 3px rgba(0,0,0,0.3);
   --primary-light: #2C3E2C;
+  --primary-soft-text: #81C784;
 }
 
 :root[data-theme="light"] {
@@ -51,8 +66,13 @@
   --text-secondary: #757575;
   --border: #E0E0E0;
   --danger-bg: #FFEBEE;
+  --error-text: #C62828;
+  --success-bg: #E8F5E9;
+  --success-text: #2E7D32;
+  --accent-orange: #E65100;
   --shadow: 0 1px 3px rgba(0,0,0,0.1);
   --primary-light: #e8f5e9;
+  --primary-soft-text: #2E7D32;
 }
 
 * {
@@ -68,6 +88,8 @@ body {
   -webkit-tap-highlight-color: transparent;
   overflow: hidden;
   height: 100dvh;
+  /* 더블탭 줌만 막고 핀치줌(접근성)은 허용 */
+  touch-action: manipulation;
 }
 
 #app {
@@ -170,11 +192,18 @@ body {
   border-color: var(--primary);
 }
 
-/* Ingredient Add Form */
+/* Ingredient Add Form — 좁은 폰 화면에서 한 줄에 다 안 들어가므로 2행 구조 */
 .add-form {
   display: flex;
+  flex-direction: column;
   gap: 8px;
   margin-bottom: 16px;
+}
+
+.add-form-row {
+  display: flex;
+  gap: 8px;
+  width: 100%;
 }
 
 .add-form input,
@@ -198,8 +227,14 @@ body {
   min-width: 0;
 }
 
+.add-form input[type="date"] {
+  flex: 1;
+  min-width: 0;
+}
+
 .add-form select {
   width: auto;
+  flex-shrink: 0;
 }
 
 .btn {
@@ -370,6 +405,13 @@ body {
   border-bottom-left-radius: 4px;
 }
 
+.chat-bubble code {
+  background: var(--bg-input);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
 .chat-input-bar {
   display: flex;
   gap: 8px;
@@ -467,19 +509,16 @@ body {
   margin-top: 8px;
 }
 
+/* 미디어쿼리 하드코딩 대신 테마 변수 사용 —
+   수동 테마(라이트/다크 선택)와 OS 다크모드가 어긋날 때 글자가 안 보이던 문제 방지 */
 .status-success {
-  background: #E8F5E9;
-  color: #2E7D32;
+  background: var(--success-bg);
+  color: var(--success-text);
 }
 
 .status-error {
-  background: #FFEBEE;
-  color: #C62828;
-}
-
-@media (prefers-color-scheme: dark) {
-  .status-success { background: #1B3A1B; color: #81C784; }
-  .status-error { background: #3E1A1A; color: #EF9A9A; }
+  background: var(--danger-bg);
+  color: var(--error-text);
 }
 
 /* Empty state */
@@ -940,7 +979,7 @@ body {
 .meal-nutrition-cal {
   padding: 2px 8px;
   border-radius: 10px;
-  background: var(--primary);
+  background: var(--primary-dark);
   color: var(--text-on-primary);
   font-weight: 600;
 }
@@ -961,6 +1000,7 @@ body {
 
 /* Utility */
 .mb-8 { margin-bottom: 8px; }
+.mb-12 { margin-bottom: 12px; }
 .mb-16 { margin-bottom: 16px; }
 .text-center { text-align: center; }
 
@@ -1010,14 +1050,8 @@ body {
 
 .feedback-reason {
   font-size: 12px;
-  color: var(--danger);
+  color: var(--error-text);
   font-weight: 500;
-}
-
-@media (prefers-color-scheme: dark) {
-  .feedback-reason {
-    color: #EF9A9A;
-  }
 }
 
 .excluded-recipes-section {
@@ -1073,7 +1107,7 @@ body {
 }
 .expiry-badge.today {
   background: #FF9800;
-  color: white;
+  color: #212121; /* 흰 글자는 주황 위에서 대비 2.2:1로 안 읽힘 */
 }
 .expiry-badge.warning {
   background: #FFC107;
@@ -1081,7 +1115,7 @@ body {
 }
 .expiry-badge.normal {
   background: var(--primary-light);
-  color: var(--primary-dark);
+  color: var(--primary-soft-text);
 }
 
 /* Inline Edit Form */
@@ -1249,6 +1283,7 @@ body {
   line-height: 1.6;
   color: var(--text);
   word-break: keep-all;
+  overflow-wrap: break-word; /* 공백 없는 긴 토큰이 카드 밖으로 넘치지 않게 */
 }
 .timer-container {
   display: flex;
@@ -1417,6 +1452,15 @@ body {
   font-size: 10px;
   font-weight: 700;
   transition: width 0.3s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.45);
+}
+
+/* 노란(#FFC107) 배경 위 흰 글자는 대비 1.6:1로 안 보임 — 어두운 글자로 */
+.macro-ratio-segment.fat {
+  color: #212121;
+  text-shadow: none;
 }
 .macro-ratio-legend {
   display: flex;
@@ -1564,7 +1608,7 @@ body {
   font-size: 10px;
   padding: 2px 6px;
   background: var(--primary-light);
-  color: var(--primary-dark);
+  color: var(--primary-soft-text);
   border-radius: 6px;
   font-weight: 600;
 }
@@ -1645,19 +1689,19 @@ body {
 .recipe-list li.ing-owned::after {
   content: ' (보유중)';
   font-size: 10px;
-  color: var(--primary-dark);
+  color: var(--primary-soft-text);
   font-weight: bold;
   margin-left: 4px;
 }
 
 .recipe-list li.ing-recommended {
-  color: #E65100;
+  color: var(--accent-orange);
   font-weight: 600;
 }
 .recipe-list li.ing-recommended::after {
   content: ' (구매필요)';
   font-size: 10px;
-  color: #E65100;
+  color: var(--accent-orange);
   font-weight: bold;
   margin-left: 4px;
 }

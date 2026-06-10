@@ -162,6 +162,27 @@ export async function exportAllData(): Promise<string> {
 
 export async function importAllData(jsonStr: string): Promise<void> {
   const data = JSON.parse(jsonStr);
+
+  // 형식 검증 — 엉뚱한 JSON 파일로 복원하면 모든 스토어가 clear()된 뒤
+  // 빈 데이터로 남는 사고를 막는다. 백업 파일의 핵심 배열이 하나도 없으면 거부.
+  const isBackupShape =
+    data &&
+    typeof data === 'object' &&
+    !Array.isArray(data) &&
+    [data.ingredients, data.bookmarks, data.meals, data.chatHistory].some(Array.isArray);
+  if (!isBackupShape) {
+    throw new Error('밥 레시피 백업 파일이 아닙니다. (ingredients/meals 등 데이터가 없음)');
+  }
+  for (const key of ['ingredients', 'bookmarks', 'meals', 'chatHistory'] as const) {
+    const arr = data[key];
+    if (arr !== undefined && !Array.isArray(arr)) {
+      throw new Error(`백업 파일 형식 오류: ${key}가 배열이 아닙니다.`);
+    }
+    if (Array.isArray(arr) && arr.some((item: unknown) => !item || typeof (item as { id?: unknown }).id !== 'string')) {
+      throw new Error(`백업 파일 형식 오류: ${key} 항목에 id가 없습니다.`);
+    }
+  }
+
   const db = await getDB();
   
   const tx = db.transaction(['ingredients', 'bookmarks', 'meals', 'chat-history'], 'readwrite');

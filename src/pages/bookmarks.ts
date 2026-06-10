@@ -1,5 +1,6 @@
 import { getAllBookmarks, deleteBookmark } from '../db';
 import { subscribe, EVENTS } from '../state';
+import { escapeHtml } from '../html-utils';
 import type { Bookmark } from '../types';
 
 export function renderBookmarks(container: HTMLElement): () => void {
@@ -68,12 +69,6 @@ export function renderBookmarks(container: HTMLElement): () => void {
 
   const unsub = subscribe(EVENTS.BOOKMARKS_CHANGED, () => renderList());
   return unsub;
-}
-
-function escapeHtml(text: string): string {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
 }
 
 function formatDate(ts: number): string {

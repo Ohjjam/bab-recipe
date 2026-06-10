@@ -2,6 +2,7 @@ import { getMealsByMonth, getMealsByDate, addMeal, deleteMeal, updateMeal } from
 import { estimateMealNutrition } from '../gemini';
 import { hasApiKey, getSettings } from '../settings-store';
 import { subscribe, emit, EVENTS } from '../state';
+import { escapeHtml } from '../html-utils';
 import type { MealEntry, Nutrition } from '../types';
 
 export function renderDiary(container: HTMLElement): () => void {
@@ -123,9 +124,9 @@ export function renderDiary(container: HTMLElement): () => void {
       <div style="font-size:12px; font-weight:600; margin-bottom: 6px; color:var(--text)">섭취 영양소 비율 (탄 : 단 : 지)</div>
       ${totalMacros > 0 ? `
         <div class="macro-ratio-bar">
-          <div class="macro-ratio-segment carbs" style="width: ${carbPercent}%; background: #4CAF50;">${carbPercent}%</div>
-          <div class="macro-ratio-segment protein" style="width: ${proteinPercent}%; background: #2196F3;">${proteinPercent}%</div>
-          <div class="macro-ratio-segment fat" style="width: ${fatPercent}%; background: #FFC107;">${fatPercent}%</div>
+          <div class="macro-ratio-segment carbs" style="width: ${carbPercent}%; background: #4CAF50;">${carbPercent >= 10 ? `${carbPercent}%` : ''}</div>
+          <div class="macro-ratio-segment protein" style="width: ${proteinPercent}%; background: #2196F3;">${proteinPercent >= 10 ? `${proteinPercent}%` : ''}</div>
+          <div class="macro-ratio-segment fat" style="width: ${fatPercent}%; background: #FFC107;">${fatPercent >= 10 ? `${fatPercent}%` : ''}</div>
         </div>
         <div class="macro-ratio-legend">
           <div class="legend-item"><span class="legend-color carbs"></span>탄 ${totalCarbs}g</div>
@@ -302,8 +303,9 @@ export function renderDiary(container: HTMLElement): () => void {
   dayMealsEl.addEventListener('click', async (e) => {
     const target = e.target as HTMLElement;
 
-    // Delete Meal
-    const deleteBtn = target.closest('[data-meal-id]') as HTMLElement | null;
+    // Delete Meal — 삭제 버튼(.ingredient-delete)만 매칭해야 함.
+    // '[data-meal-id]'만으로 찾으면 영양소 수정 폼(같은 속성 보유) 내부 클릭이 전부 삭제로 처리됨.
+    const deleteBtn = target.closest('.ingredient-delete[data-meal-id]') as HTMLElement | null;
     if (deleteBtn) {
       await deleteMeal(deleteBtn.dataset.mealId!);
       editingMealId = null;
@@ -417,8 +419,3 @@ function toDateStr(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-function escapeHtml(text: string): string {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}

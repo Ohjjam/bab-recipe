@@ -1,4 +1,5 @@
 import { getSettings } from './settings-store';
+import { daysUntilLocal } from './date-utils';
 import type { Ingredient, ChatMessage, Recipe, Nutrition, ShoppingSuggestionResult } from './types';
 
 const BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
@@ -28,19 +29,26 @@ const SYSTEM_INSTRUCTION = `당신은 한국 가정 요리 전문가입니다. �
 - 요구사항과 재료 제약이 충돌할 때만 재료 제약이 우선. (예: "오징어 요리" 요청인데 오징어 재료 없음 → 오징어 요리 추천 불가, 다른 요리로 대체)
 
 【 규칙 1: 요리 이름은 실제 존재하는 정식 요리명만 】
-- 반드시 실제로 존재하는 정식 요리 이름을 사용하세요.
-  예: "제육볶음", "김치찌개", "계란말이", "떡볶이", "된장찌개", "닭갈비", "비빔밥", "김치볶음밥", "미역국", "잡채", "김치전", "콩나물국", "순두부찌개", "부대찌개", "감자조림", "무생채", "어묵볶음", "멸치볶음", "간장계란밥", "참치마요덮밥", "오믈렛", "토마토파스타", "알리오올리오", "크림파스타", "카레라이스", "하이라이스", "계란볶음밥", "돼지고기김치찌개", "오므라이스", "닭볶음탕", "감자채볶음"
+- 반드시 실제로 존재하는, 식당 메뉴판에 그대로 쓸 수 있는 정식 요리 이름만 사용하세요.
+  (예: "제육볶음", "김치찌개", "닭볶음탕", "잡채", "오므라이스", "알리오올리오" — 이것은 형식 참고용 일부 예시일 뿐입니다. 이 예시에 얽매이지 말고 한국 가정식 전체와 대중적인 중식·일식·양식 가정 요리까지 폭넓게 고르세요.)
 - 절대로 재료를 나열한 이름을 만들지 마세요.
   ❌ 금지: "오리 매콤 볶음밥", "양배추 닭고기 볶음", "계란 파프리카 볶음", "치즈 양파 감자조림", "김치 치즈 볶음밥", "치즈 삼겹살 구이", "양파 계란 볶음"
-- 재료 2개 이상을 그냥 붙여놓은 이름(예: "A B C")은 금지. 메뉴판에 그대로 쓸 수 있는 정식 요리명만.
+- "구운 고기", "닭가슴살 샐러드", "야채볶음", "고기 구이"처럼 재료+조리행위만 붙인 성의 없는 명칭도 금지.
+  (단, "삼겹살구이", "오징어볶음", "LA갈비"처럼 실제로 통용되는 메뉴명은 허용)
+- 재료 2개 이상을 그냥 붙여놓은 이름(예: "A B C")은 금지.
 - 한국인이 실제로 "오늘 뭐 먹을까?"라고 고민할 때 떠올리는 진짜 요리만 추천하세요.
+
+【 규칙 1-1: 다양성 — 매번 같은 추천 반복 금지 】
+- 추천 3개는 서로 다른 조리 형태여야 합니다: 국/찌개/전골, 볶음/구이, 조림/찜, 무침/샐러드, 면 요리, 밥/덮밥/볶음밥, 전/부침 중 서로 다른 카테고리에서 하나씩.
+- "최근에 추천했던 요리" 목록이 입력에 주어지면, 그 요리들과 이름이 같거나 사실상 같은 변형인 요리는 피하세요.
+- 안전하고 단순한 요리만 반복하지 말고, 재료가 허락하는 한 풍성하고 제대로 된 한 끼 요리를 제안하세요.
 
 【 규칙 2: 재료 제약 — 매우 중요 】
 - 사용자가 가진 재료 리스트(입력으로 제공됨)에 없는 재료는 절대로 주재료로 사용하지 마세요.
 - 예시: 사용자 재료에 "김치"가 없으면, 김치찌개/김치볶음밥/김치전 같은 김치가 주재료인 요리는 추천 금지.
 - 예시: "닭고기"가 없으면 닭갈비/닭볶음탕 추천 금지. "오징어"가 없으면 오징어볶음 추천 금지.
 - ingredients 필드에 "(있다면)", "(선택사항)" 같은 주재료를 넣지 마세요. 주재료는 확실히 사용자에게 있는 것만.
-- 예외로 허용되는 "기본 양념"만 자유롭게 써도 됩니다: 소금, 설탕, 간장, 고추장, 된장, 식초, 식용유, 참기름, 들기름, 후추, 다진마늘, 물, 고춧가루. 이 외 재료는 사용자 리스트에 반드시 있어야 합니다.
+- 예외로 허용되는 "기본 양념·상비 재료"만 자유롭게 써도 됩니다: 소금, 설탕, 간장, 고추장, 된장, 식초, 식용유, 참기름, 들기름, 후추, 다진마늘, 물, 고춧가루, 밀가루, 부침가루, 전분, 케첩, 마요네즈, 맛술, 굴소스, 올리고당, 액젓, 통깨, 대파. 이 외 재료는 사용자 리스트에 반드시 있어야 합니다.
 - 재료가 부족해서 3가지 요리가 안 떠오르면, 같은 메인 재료로 변형을 제안하거나(예: 삼겹살 → 제육볶음/삼겹살구이/삼겹살숙주볶음) 간단한 요리 위주로 선택하세요.
 
 【 규칙 2-1: 이름과 재료 일치 】
@@ -55,11 +63,14 @@ const SYSTEM_INSTRUCTION = `당신은 한국 가정 요리 전문가입니다. �
 - description은 어떤 요리인지 한 줄로 간단히 (재료 나열 금지).
 - 모든 답변은 한국어로.`;
 
-// 기본 양념 화이트리스트 (재료 리스트에 없어도 허용)
+// 기본 양념·상비 재료 화이트리스트 (재료 리스트에 없어도 허용)
 const BASIC_SEASONINGS = [
   '소금', '설탕', '간장', '진간장', '국간장', '고추장', '된장', '쌈장', '초고추장',
-  '식초', '식용유', '참기름', '들기름', '후추', '다진마늘', '마늘', '물', '고춧가루',
-  '올리고당', '물엿', '맛술', '미림', '굴소스', '참깨', '통깨', '대파',
+  '식초', '식용유', '참기름', '들기름', '후추', '후춧가루', '다진마늘', '마늘', '물', '고춧가루',
+  '올리고당', '물엿', '맛술', '미림', '청주', '굴소스', '참깨', '통깨', '깨소금', '대파',
+  '밀가루', '부침가루', '튀김가루', '전분', '감자전분', '옥수수전분', '녹말', '녹말가루',
+  '케첩', '케찹', '토마토케첩', '마요네즈', '머스타드', '꿀', '깨', '빵가루',
+  '액젓', '멸치액젓', '까나리액젓', '국물용 멸치', '다시마', '육수', '멸치육수', '치킨스톡',
 ];
 
 // 재료 별칭 그룹 — 같은 그룹에 있는 재료들은 상호 대체 가능한 동의어로 간주
@@ -98,6 +109,18 @@ function expandWithAliases(name: string): string[] {
   return [...result];
 }
 
+// 실패 응답을 사용자에게 보여줄 수 있는 에러로 변환 (긴 HTML 에러 페이지 본문은 잘라냄)
+async function toApiError(res: Response): Promise<Error> {
+  let body = '';
+  try {
+    body = await res.text();
+  } catch {
+    // 본문 읽기 실패는 무시
+  }
+  const trimmed = body.length > 300 ? `${body.slice(0, 300)}…` : body;
+  return new Error(`Gemini API 오류 (${res.status}): ${trimmed}`);
+}
+
 function normalizeIngredientName(raw: string): string {
   // "삼겹살 300g" → "삼겹살", "양파 1/2개" → "양파"
   return raw
@@ -124,15 +147,16 @@ function matchesIngredient(name: string, candidates: string[]): boolean {
 }
 
 // 제목에 자주 등장하는 주재료 (사용자가 없는데 제목에 들어가면 탈락)
+// 주의: 1글자 키워드는 검증 루프의 length<2 가드에 걸려 동작하지 않으므로 넣지 말 것
 const COMMON_INGREDIENT_KEYWORDS = [
-  '김치', '두부', '닭', '소고기', '돼지고기', '삼겹살', '목살', '오징어', '새우', '문어',
-  '꽁치', '고등어', '삼치', '연어', '참치', '멸치', '김', '미역', '다시마',
-  '콩나물', '시금치', '무', '배추', '상추', '깻잎', '부추', '쑥갓',
+  '김치', '두부', '소고기', '돼지고기', '삼겹살', '목살', '오징어', '새우', '문어',
+  '꽁치', '고등어', '삼치', '연어', '참치', '멸치', '미역', '다시마',
+  '콩나물', '시금치', '배추', '상추', '깻잎', '부추', '쑥갓',
   '감자', '고구마', '당근', '오이', '호박', '애호박', '가지', '피망', '파프리카',
   '양파', '대파', '마늘', '생강', '계란', '달걀', '치즈', '우유', '버터',
   '버섯', '팽이버섯', '새송이버섯', '표고버섯', '느타리버섯',
-  '만두', '떡', '라면', '우동', '소바', '파스타', '스파게티', '햇반', '밥',
-  '토마토', '베이컨', '햄', '소시지', '참치캔', '스팸',
+  '만두', '라면', '우동', '소바', '파스타', '스파게티', '햇반',
+  '토마토', '베이컨', '소시지', '참치캔', '스팸',
 ];
 
 // 레시피가 제외된 구체적인 이유(필수 재료 부족 등)를 반환하는 함수
@@ -152,7 +176,10 @@ export function getRecipeValidationErrors(recipe: Recipe, availableNames: string
   }
 
   const normalizedAvail = availableNames.map(normalizeIngredientName).filter(Boolean);
-  const expandedAvail = normalizedAvail.flatMap(expandWithAliases);
+  // 사용자가 "냉동 삼겹살", "국산 양파"처럼 수식어를 붙여 등록해도 매칭되도록
+  // 공백 기준 토큰(2글자 이상)도 후보에 포함하고, 토큰에도 별칭 확장을 적용
+  const tokens = normalizedAvail.flatMap((n) => n.split(/\s+/).filter((t) => t.length >= 2));
+  const expandedAvail = [...new Set([...normalizedAvail, ...tokens])].flatMap(expandWithAliases);
   const candidates = [...expandedAvail, ...BASIC_SEASONINGS];
 
   // 1) ingredients 배열 검증 — 모델이 적은 모든 재료가 사용자/별칭/양념에 매칭되어야 함
@@ -180,12 +207,14 @@ export function getRecipeValidationErrors(recipe: Recipe, availableNames: string
     errors.push(`부족한 재료: ${missingIngredients.join(', ')}`);
   }
 
-  // 2) 제목 검증 — 주재료 키워드가 제목에 있는데 사용자 재료(+별칭)에 없으면 탈락
+  // 2) 제목 검증 — 주재료 키워드가 제목에 있는데 사용자 재료(+별칭+기본 양념)에 없으면 탈락
+  // 기본 양념을 포함해야 "대파제육볶음" 같은 제목이 모순 탈락하지 않음
+  const titleCandidates = [...expandedAvail, ...BASIC_SEASONINGS];
   const missingTitleKeywords: string[] = [];
   for (const keyword of COMMON_INGREDIENT_KEYWORDS) {
     if (keyword.length < 2) continue;
     if (!recipe.title.includes(keyword)) continue;
-    const userHas = expandedAvail.some((n) => n === keyword || n.includes(keyword) || keyword.includes(n));
+    const userHas = titleCandidates.some((n) => n === keyword || n.includes(keyword) || keyword.includes(n));
     if (!userHas) {
       missingTitleKeywords.push(keyword);
     }
@@ -210,6 +239,28 @@ export interface SuggestionResult {
   }[];
 }
 
+// 최근 추천 이력 (세션을 넘어 유지) — 같은 냉장고로 매번 같은 3개가 나오는 것 방지
+const RECENT_TITLES_KEY = 'bab-recipe-recent-titles';
+const RECENT_TITLES_MAX = 24;
+
+function getRecentTitles(): string[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(RECENT_TITLES_KEY) || '[]');
+    return Array.isArray(parsed) ? parsed.filter((t): t is string => typeof t === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function rememberTitles(titles: string[]): void {
+  try {
+    const merged = [...titles, ...getRecentTitles().filter((t) => !titles.includes(t))];
+    localStorage.setItem(RECENT_TITLES_KEY, JSON.stringify(merged.slice(0, RECENT_TITLES_MAX)));
+  } catch {
+    // localStorage 실패는 무시 (추천 자체에는 영향 없음)
+  }
+}
+
 // 구조화된 레시피 3개 반환 (JSON mode). 최대 2회 재시도로 재료 맞는 것만 필터.
 export async function getRecipeSuggestions(
   ingredients: Ingredient[],
@@ -220,9 +271,11 @@ export async function getRecipeSuggestions(
   const collected: Recipe[] = [];
   const invalidRecipes: { recipe: Recipe; reasons: string[] }[] = [];
   const seenTitles = new Set<string>();
+  const recentTitles = getRecentTitles();
 
   for (let attempt = 0; attempt < 3 && collected.length < 3; attempt++) {
-    const batch = await fetchRecipes(ingredients, preference, attempt, collected.map((r) => r.title), servingSize);
+    const invalidFeedback = invalidRecipes.map((ir) => ({ title: ir.recipe.title, reasons: ir.reasons }));
+    const batch = await fetchRecipes(ingredients, preference, attempt, collected.map((r) => r.title), servingSize, recentTitles, invalidFeedback);
     for (const r of batch) {
       if (seenTitles.has(r.title)) continue;
       
@@ -240,6 +293,10 @@ export async function getRecipeSuggestions(
     }
   }
 
+  if (collected.length > 0) {
+    rememberTitles(collected.map((r) => r.title));
+  }
+
   return {
     recipes: collected,
     invalidRecipes,
@@ -251,7 +308,9 @@ async function fetchRecipes(
   preference: string | undefined,
   attempt: number,
   excludeTitles: string[],
-  servingSize: string
+  servingSize: string,
+  recentTitles: string[],
+  invalidFeedback: { title: string; reasons: string[] }[] = []
 ): Promise<Recipe[]> {
   const settings = getSettings();
   const { geminiApiKey, geminiModel, excludedIngredients } = settings;
@@ -272,15 +331,12 @@ async function fetchRecipes(
   // 유통기한 임박 재료 우선 소진 힌트
   const expiringSoon = ingredients.filter(i => {
     if (!i.expiryDate) return false;
-    const diff = new Date(i.expiryDate).getTime() - new Date().setHours(0, 0, 0, 0);
-    const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
-    return days <= 3;
+    return daysUntilLocal(i.expiryDate) <= 3;
   });
   if (expiringSoon.length > 0) {
     prompt += `⚠️【 유통기한 임박 재료 — 최우선 소진 권장 】\n`;
     for (const item of expiringSoon) {
-      const diff = new Date(item.expiryDate!).getTime() - new Date().setHours(0, 0, 0, 0);
-      const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+      const days = daysUntilLocal(item.expiryDate!);
       const ddayStr = days < 0 ? `만료 ${Math.abs(days)}일 지남` : (days === 0 ? '오늘 만료' : `D-${days}`);
       prompt += `- ${item.name} (${ddayStr})\n`;
     }
@@ -308,21 +364,31 @@ async function fetchRecipes(
     prompt += `【 재료 표기 별칭 — 같은 재료로 취급 】\n${aliasHints.join('\n')}\n\n`;
   }
 
-  prompt += `【 기본 양념 (위 목록에 없어도 자유롭게 사용 가능) 】\n소금, 설탕, 간장, 고추장, 된장, 식초, 식용유, 참기름, 들기름, 후추, 다진마늘, 물, 고춧가루\n\n`;
-  prompt += `위 재료만으로 만들 수 있는 실제 한국/가정 요리 3가지를 추천하세요.\n\n`;
+  prompt += `【 기본 양념·상비 재료 (위 목록에 없어도 자유롭게 사용 가능) 】\n소금, 설탕, 간장, 고추장, 된장, 식초, 식용유, 참기름, 들기름, 후추, 다진마늘, 물, 고춧가루, 밀가루, 부침가루, 전분, 케첩, 마요네즈, 맛술, 굴소스, 올리고당, 액젓, 통깨, 대파\n\n`;
+  prompt += `위 재료만으로 만들 수 있는 실제 가정 요리 3가지를 추천하세요. 셋은 서로 다른 조리 형태(국/찌개, 볶음/구이, 조림/찜, 면, 밥/덮밥, 전/부침, 무침 등)여야 합니다.\n\n`;
   prompt += `반드시 답변 전에 내부적으로 다음 체크리스트를 확인하세요:\n`;
   if (preference && preference.trim()) {
     prompt += `0) 사용자 요구사항을 3개 중 최소 2개의 추천이 직접 충족하는가? (특정 재료 언급 시 그 재료가 들어간 요리 포함)\n`;
   }
-  prompt += `1) 추천하는 요리 이름이 실제 존재하는 정식 요리 이름인가? (재료 나열식 이름 아님)\n`;
+  prompt += `1) 추천하는 요리 이름이 실제 존재하는 정식 요리 이름인가? (재료 나열식 이름, "구운 고기" 같은 즉석 명칭 아님)\n`;
   prompt += `2) 요리 이름에 있는 재료가 모두 "사용 가능한 재료" 목록에 있는가?\n`;
-  prompt += `3) ingredients 배열의 모든 재료가 "사용 가능한 재료" 또는 "기본 양념"에 있는가?\n`;
+  prompt += `3) ingredients 배열의 모든 재료가 "사용 가능한 재료" 또는 "기본 양념·상비 재료"에 있는가?\n`;
+  prompt += `4) 추천 3개가 서로 다른 조리 형태인가? "최근에 추천했던 요리"와 겹치지 않는가?\n`;
   prompt += `하나라도 No면, 그 요리 대신 다른 요리를 고르세요.\n\n`;
   if (excludeTitles.length > 0) {
     prompt += `【 이미 추천된 요리 (제외) 】 ${excludeTitles.join(', ')}\n\n`;
   }
-  if (attempt > 0) {
-    prompt += `⚠️ 이전 시도에서 일부 레시피가 "사용 가능한 재료"에 없는 재료를 포함해 탈락했습니다. 이번엔 반드시 "사용 가능한 재료" + "기본 양념"만 사용하세요.\n\n`;
+  if (recentTitles.length > 0) {
+    prompt += `【 최근에 추천했던 요리 — 오늘은 가급적 다른 요리로 】\n${recentTitles.join(', ')}\n(재료가 한정되어 정말 다른 선택지가 없는 경우에만 중복 허용)\n\n`;
+  }
+  if (attempt > 0 && invalidFeedback.length > 0) {
+    prompt += `⚠️【 이전 시도에서 탈락한 레시피와 사유 — 같은 실수 반복 금지 】\n`;
+    for (const f of invalidFeedback.slice(-6)) {
+      prompt += `- ${f.title}: ${f.reasons.join(', ')}\n`;
+    }
+    prompt += `위 탈락 사유를 참고해, 이번에는 반드시 "사용 가능한 재료" + "기본 양념·상비 재료"만 사용하는 다른 요리를 제안하세요.\n\n`;
+  } else if (attempt > 0) {
+    prompt += `⚠️ 이전 시도에서 일부 레시피가 "사용 가능한 재료"에 없는 재료를 포함해 탈락했습니다. 이번엔 반드시 "사용 가능한 재료" + "기본 양념·상비 재료"만 사용하세요.\n\n`;
   }
   prompt += `각 레시피는 title, difficulty(쉬움/보통/어려움), time(예: "15분"), description(한 줄), ingredients(분량 포함), steps(순서대로) 필드를 포함합니다.`;
 
@@ -334,7 +400,8 @@ async function fetchRecipes(
       system_instruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       generationConfig: {
-        temperature: 0.4,
+        // 다양성을 위해 높게 설정 — 낮으면 같은 냉장고에 항상 같은 3개가 나옴
+        temperature: 1.0,
         responseMimeType: 'application/json',
         responseSchema: {
           type: 'object',
@@ -362,8 +429,7 @@ async function fetchRecipes(
   });
 
   if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Gemini API 오류 (${res.status}): ${err}`);
+    throw await toApiError(res);
   }
 
   const data = await res.json();
@@ -376,7 +442,8 @@ async function fetchRecipes(
 
 export async function* streamChat(
   messages: ChatMessage[],
-  ingredients: Ingredient[]
+  ingredients: Ingredient[],
+  signal?: AbortSignal
 ): AsyncGenerator<string> {
   const { geminiApiKey, geminiModel } = getSettings();
   if (!geminiApiKey) throw new Error('API 키가 설정되지 않았습니다.');
@@ -389,7 +456,7 @@ export async function* streamChat(
     parts: [{ text: m.text }],
   }));
 
-  yield* streamGemini(geminiApiKey, geminiModel, contents, systemWithContext);
+  yield* streamGemini(geminiApiKey, geminiModel, contents, systemWithContext, signal);
 }
 
 export async function estimateMealNutrition(title: string, memo?: string): Promise<Nutrition> {
@@ -432,8 +499,7 @@ export async function estimateMealNutrition(title: string, memo?: string): Promi
   });
 
   if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Gemini API 오류 (${res.status}): ${err}`);
+    throw await toApiError(res);
   }
 
   const data = await res.json();
@@ -468,13 +534,15 @@ async function* streamGemini(
   apiKey: string,
   model: string,
   contents: Array<{ role: string; parts: Array<{ text: string }> }>,
-  systemInstruction: string
+  systemInstruction: string,
+  signal?: AbortSignal
 ): AsyncGenerator<string> {
   const url = `${BASE_URL}/${model}:streamGenerateContent?alt=sse&key=${apiKey}`;
 
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    signal,
     body: JSON.stringify({
       system_instruction: { parts: [{ text: systemInstruction }] },
       contents,
@@ -486,8 +554,7 @@ async function* streamGemini(
   });
 
   if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Gemini API 오류 (${res.status}): ${err}`);
+    throw await toApiError(res);
   }
 
   const reader = res.body!.getReader();
@@ -553,7 +620,7 @@ export async function getShoppingSuggestions(
     body: JSON.stringify({
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       generationConfig: {
-        temperature: 0.5,
+        temperature: 0.9,
         responseMimeType: 'application/json',
         responseSchema: {
           type: 'object',
@@ -594,8 +661,7 @@ export async function getShoppingSuggestions(
   });
 
   if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Gemini API 오류 (${res.status}): ${err}`);
+    throw await toApiError(res);
   }
 
   const data = await res.json();
